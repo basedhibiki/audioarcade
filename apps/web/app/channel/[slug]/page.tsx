@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Room, RoomEvent, Track, createLocalTracks } from 'livekit-client'
 
+
 export default function ChannelPage({ params }: { params: { slug: string } }) {
   const roomName = params.slug
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'publishing'>('idle')
@@ -104,17 +105,29 @@ export default function ChannelPage({ params }: { params: { slug: string } }) {
     }
   }
 
-  async function stopPublishing() {
-    const room = roomRef.current
-    if (!room) return
-    room.localParticipant.tracks.forEach((pub) => {
-      if (pub.track?.kind === Track.Kind.Audio) {
-        room.localParticipant.unpublishTrack(pub.track, true)
-        pub.track.stop()
-      }
-    })
-    setStatus('connected')
+
+
+async function stopPublishing() {
+  const room = roomRef.current
+  if (!room) return
+
+  // publications for the *local* participant
+  const pubs = room.localParticipant.getTrackPublications()
+
+  for (const pub of pubs) {
+    // only unpublish local audio tracks
+    if (pub.track?.kind === Track.Kind.Audio) {
+      // v2 API: unpublish can take a track SID (string)
+      const sid = 'trackSid' in pub ? pub.trackSid : (pub as any).sid
+      room.localParticipant.unpublishTrack(sid, true) // stopOnUnpublish = true
+      pub.track.stop()
+    }
   }
+
+  setStatus('connected')
+}
+
+
 
   function leave() {
     const room = roomRef.current
