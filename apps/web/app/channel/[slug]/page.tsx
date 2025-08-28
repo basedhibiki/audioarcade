@@ -1,14 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import {
-  Room,
-  RoomEvent,
-  Track,
-  createLocalTracks,
-  type RoomConnectOptions,
-  type RoomOptions,
-} from 'livekit-client'
+import { Room, RoomEvent, Track, createLocalTracks } from 'livekit-client'
 
 export default function ChannelPage({ params }: { params: { slug: string } }) {
   const roomName = params.slug
@@ -32,11 +25,15 @@ export default function ChannelPage({ params }: { params: { slug: string } }) {
         const { token } = await res.json()
         if (!token) throw new Error('No token from LiveKit API')
 
-        const connectOpts: RoomConnectOptions = {}
-        const roomOpts: RoomOptions = {}
-
-        await room.connect(livekitUrl, token, connectOpts, roomOpts)
-        if (cancelled) { room.disconnect(); return }
+        // Single options object (optional). You can add reconnect, adaptiveStream, etc. here.
+        await room.connect(livekitUrl, token, {
+          // reconnect: true,
+          // adaptiveStream: true,
+        })
+        if (cancelled) {
+          room.disconnect()
+          return
+        }
         roomRef.current = room
         setStatus('connected')
 
