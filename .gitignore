@@ -1,0 +1,41 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Next.js
+.next/
+out/
+.vercel/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+android/
+ios/
+*.keystore
+
+# Build artifacts
+dist/
+build/
+coverage/
+*.log
+
+# Monorepo / tooling
+.turbo/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+.env.*
+!.env.example
+apps/web/.env.local
+services/signaling/.env

@@ -1,0 +1,17 @@
+{
+  "name": "audio-arcade-starter",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "dev:signaling": "npm --workspace services/signaling run dev",
+    "dev:mobile": "npm --workspace apps/mobile run start",
+    "build": "npm -w apps/web run build && npm -w services/signaling run build",
+    "start": "npm -w apps/web run start"
+  }
+}

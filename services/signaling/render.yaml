@@ -1,0 +1,12 @@
+# Render blueprint (optional)
+services:
+  - type: web
+    name: audio-arcade-signaling
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "node src/index.js"
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8787

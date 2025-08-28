@@ -1,0 +1,17 @@
+{
+  "name": "@audio-arcade/signaling",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "fastify": "^4.28.1",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

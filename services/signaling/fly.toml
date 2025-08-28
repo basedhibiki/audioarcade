@@ -1,0 +1,31 @@
+# fly.toml app configuration file generated for audio-arcade-signaling on 2025-08-18T12:01:24+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'audio-arcade-signaling'
+primary_region = 'lhr'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  PORT = '8787'
+
+[[services]]
+  protocol = 'tcp'
+  internal_port = 8787
+  processes = ['app']
+
+  [[services.ports]]
+    port = 80
+    handlers = ['http']
+
+  [[services.ports]]
+    port = 443
+    handlers = ['tls', 'http']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
