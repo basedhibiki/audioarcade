@@ -304,14 +304,15 @@ export default function ChannelPage({ params }: { params: { slug: string } }) {
         {error && <div className="mt-2 rounded bg-red-600/10 p-2 text-red-700">{error}</div>}
       </div>
 
-      {/* Hidden file input for "Play File to AUX" */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="audio/*"
-        className="hidden"
-        onChange={onAuxFilePicked}
-      />
+    {/* Hidden file input for "Play File to AUX" */}
+<input
+  ref={fileInputRef}
+  type="file"
+  accept="audio/*"
+  style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none', left: -9999, top: 0 }}
+  onChange={onAuxFilePicked}
+/>
+
 
       <div className="ps2-grid">
         {/* AUX controls */}
