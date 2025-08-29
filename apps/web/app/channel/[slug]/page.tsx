@@ -82,6 +82,14 @@ function stopNamedTrack(name: 'aux' | 'collab') {
   computeStateAndMaybePlay()
 }
 
+let rafId: number | null = null
+function computeStateAndMaybePlayRAF() {
+  if (rafId) cancelAnimationFrame(rafId)
+  rafId = requestAnimationFrame(() => {
+    computeStateAndMaybePlay()
+    rafId = null
+  })
+}
 
   // ----- lifecycle -----
 
@@ -116,12 +124,19 @@ function stopNamedTrack(name: 'aux' | 'collab') {
         }
 
         // events → recompute + (maybe) play
-        room.on(RoomEvent.TrackSubscribed, computeStateAndMaybePlay)
-        room.on(RoomEvent.TrackUnsubscribed, computeStateAndMaybePlay)
-        room.on(RoomEvent.ParticipantConnected, computeStateAndMaybePlay)
-        room.on(RoomEvent.ParticipantDisconnected, computeStateAndMaybePlay)
-        room.on(RoomEvent.LocalTrackPublished, computeStateAndMaybePlay)
-        room.on(RoomEvent.LocalTrackUnpublished, computeStateAndMaybePlay)
+        room.on(RoomEvent.TrackSubscribed, computeStateAndMaybePlayRAF)
+room.on(RoomEvent.TrackUnsubscribed, computeStateAndMaybePlayRAF)
+room.on(RoomEvent.ParticipantConnected, computeStateAndMaybePlayRAF)
+room.on(RoomEvent.ParticipantDisconnected, computeStateAndMaybePlayRAF)
+room.on(RoomEvent.LocalTrackPublished, computeStateAndMaybePlayRAF)
+room.on(RoomEvent.LocalTrackUnpublished, computeStateAndMaybePlayRAF)
+
+        // room.on(RoomEvent.TrackSubscribed, computeStateAndMaybePlay)
+        // room.on(RoomEvent.TrackUnsubscribed, computeStateAndMaybePlay)
+        // room.on(RoomEvent.ParticipantConnected, computeStateAndMaybePlay)
+        // room.on(RoomEvent.ParticipantDisconnected, computeStateAndMaybePlay)
+        // room.on(RoomEvent.LocalTrackPublished, computeStateAndMaybePlay)
+        // room.on(RoomEvent.LocalTrackUnpublished, computeStateAndMaybePlay)
 
         // control protocol via data messages
         room.on(RoomEvent.DataReceived, (payload) => {
