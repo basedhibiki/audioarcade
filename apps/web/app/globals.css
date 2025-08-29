@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+body {
+  @apply bg-black text-gray-200; /* full black background */
+  font-family: 'Orbitron', sans-serif; /* optional PS2-style font */
+}
+
+@layer components {
+  .ps2-input {
+    @apply rounded-xl border-2 border-blue-400 bg-black/50 text-blue-100 px-4 py-2
+           focus:outline-none focus:border-blue-500 transition-colors duration-200;
+    text-shadow: 0 0 8px rgba(0,128,255,.4);
+  }
+}
+
+.ps2-btn {
+@apply relative inline-flex items-center justify-center
+           px-4 py-2 rounded-xl border-2
+           border-blue-400 text-blue-200 uppercase tracking-wider
+           transition-all duration-200
+           hover:border-blue-500 hover:text-white;
+    background: rgba(0, 0, 64, 0.3);
+    text-shadow: 0 0 8px rgba(0, 128, 255, 0.6);
+}
+
+/* optional glowing animation */
+.ps2-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 10px rgba(0, 128, 255, 0.8),
+              0 0 20px rgba(0, 128, 255, 0.6);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ps2-btn:hover::after {
+  opacity: 1;
+}
+
+/* Optional grid wrapper to mimic PS2 menu tiles */
+@layer utilities {
+  .ps2-grid { @apply grid grid-cols-2 gap-4 place-items-center; }
+}
