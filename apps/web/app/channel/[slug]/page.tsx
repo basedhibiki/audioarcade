@@ -7,8 +7,6 @@ import {
   type RemoteParticipant, type TrackPublication,
 } from 'livekit-client'
 
-
-
 type Msg =
   | { type: 'collab:allow'; allowed: boolean }
   | { type: 'collab:close' }
@@ -20,7 +18,8 @@ export default function ChannelPage({ params }: { params: { slug: string } }) {
   const [error, setError] = useState<string | null>(null)
 
   // UX states
-  const [isListening, setIsListening] = useState(true)
+  const [isListening, setIsListening] = useState(false) // start muted
+
   const [iHaveAux, setIHaveAux] = useState(false)
   const [collabAllowed, setCollabAllowed] = useState(false)
   const [collabOccupied, setCollabOccupied] = useState(false)
@@ -36,30 +35,65 @@ export default function ChannelPage({ params }: { params: { slug: string } }) {
     return room.localParticipant.getTrackPublications().filter(p => p.track?.kind === Track.Kind.Audio)
   }
 
-function refreshAuxFlags() {
-  const room = roomRef.current
-  if (!room) return
+  function computeStateAndMaybePlay() {
+    const room = roomRef.current
+    if (!room) return
 
-  // Do I have aux? (any local audio track named 'aux')
-  const mine = room.localParticipant.getTrackPublications()
-  setIHaveAux(
-    mine.some((p: TrackPublication) =>
-      p.track?.kind === Track.Kind.Audio &&
-      (p.trackName === 'aux' || p.track?.mediaStreamTrack.label === 'aux')
+    // I have aux?
+    const mine = room.localParticipant.getTrackPublications()
+    setIHaveAux(
+      mine.some((p: TrackPublication) =>
+        p.track?.kind === Track.Kind.Audio &&
+        (p.trackName === 'aux' || p.track?.mediaStreamTrack.label === 'aux')
+      )
     )
-  )
 
-  // Is collab occupied? (any remote audio track named 'collab')
-  const participants: RemoteParticipant[] = Array.from(room.remoteParticipants.values())
-  const anyCollab = participants.some((part: RemoteParticipant) =>
-    part.getTrackPublications().some((p: TrackPublication) =>
-      p.track?.kind === Track.Kind.Audio && p.trackName === 'collab'
+    // Find remote aux (or collab)
+    const remotes: RemoteParticipant[] = Array.from(room.remoteParticipants.values())
+    const findByName = (name: 'aux' | 'collab') =>
+      remotes.flatMap(r => r.getTrackPublications()).find((p: TrackPublication) =>
+        p.track?.kind === Track.Kind.Audio && p.trackName === name
+      )
+
+    const target = findByName('aux') ?? findByName('collab')
+
+    if (audioElRef.current) {
+      if (target?.track) {
+        audioElRef.current.srcObject = new MediaStream([target.track.mediaStreamTrack])
+        if (!audioElRef.current.muted) {
+          audioElRef.current.play().catch(() => {})
+        }
+      } else {
+        audioElRef.current.srcObject = null
+      }
+    }
+
+    // Collab occupied flag
+    setCollabOccupied(Boolean(findByName('collab')))
+  }
+
+  function refreshAuxFlags() {
+    const room = roomRef.current
+    if (!room) return
+
+    // Do I have aux? (any local audio track named 'aux')
+    const mine = room.localParticipant.getTrackPublications()
+    setIHaveAux(
+      mine.some((p: TrackPublication) =>
+        p.track?.kind === Track.Kind.Audio &&
+        (p.trackName === 'aux' || p.track?.mediaStreamTrack.label === 'aux')
+      )
     )
-  )
-  setCollabOccupied(anyCollab)
-}
 
-
+    // Is collab occupied? (any remote audio track named 'collab')
+    const participants: RemoteParticipant[] = Array.from(room.remoteParticipants.values())
+    const anyCollab = participants.some((part: RemoteParticipant) =>
+      part.getTrackPublications().some((p: TrackPublication) =>
+        p.track?.kind === Track.Kind.Audio && p.trackName === 'collab'
+      )
+    )
+    setCollabOccupied(anyCollab)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -86,7 +120,7 @@ function refreshAuxFlags() {
           const el = document.createElement('audio')
           el.autoplay = true
           el.controls = true
-          el.muted = !isListening
+          el.muted = true // start muted, require click
           el.style.position = 'fixed'
           el.style.bottom = '12px'
           el.style.left = '12px'
@@ -95,24 +129,13 @@ function refreshAuxFlags() {
           audioElRef.current = el
         }
 
-        // Subscribe playback: whenever we get a remote audio track, play it
-        room.on(RoomEvent.TrackSubscribed, (_track, publication, participant) => {
-          const track = publication.track
-          if (track?.kind === Track.Kind.Audio) {
-            const mediaStream = new MediaStream([track.mediaStreamTrack])
-            if (audioElRef.current) audioElRef.current.srcObject = mediaStream
-          }
-          refreshAuxFlags()
-        })
-        room.on(RoomEvent.TrackUnsubscribed, () => {
-          // When a publisher leaves/stops, clear/refresh flags
-          if (audioElRef.current) audioElRef.current.srcObject = null
-          refreshAuxFlags()
-        })
-        room.on(RoomEvent.ParticipantConnected, refreshAuxFlags)
-        room.on(RoomEvent.ParticipantDisconnected, refreshAuxFlags)
-        room.on(RoomEvent.LocalTrackPublished, refreshAuxFlags)
-        room.on(RoomEvent.LocalTrackUnpublished, refreshAuxFlags)
+        // === Unified listeners -> recompute + (maybe) play ===
+        room.on(RoomEvent.TrackSubscribed, computeStateAndMaybePlay)
+        room.on(RoomEvent.TrackUnsubscribed, computeStateAndMaybePlay)
+        room.on(RoomEvent.ParticipantConnected, computeStateAndMaybePlay)
+        room.on(RoomEvent.ParticipantDisconnected, computeStateAndMaybePlay)
+        room.on(RoomEvent.LocalTrackPublished, computeStateAndMaybePlay)
+        room.on(RoomEvent.LocalTrackUnpublished, computeStateAndMaybePlay)
 
         // Minimal control protocol via data messages
         room.on(RoomEvent.DataReceived, (payload, _participant, _kind, _topic) => {
@@ -123,10 +146,13 @@ function refreshAuxFlags() {
               // if I’m collaborating, stop my collab track
               stopNamedTrack('collab')
             }
+            // After control changes, recompute to reflect UI/audio state
+            computeStateAndMaybePlay()
           } catch { /* ignore */ }
         })
 
-        refreshAuxFlags()
+        // Prime UI/audio state once on join
+        computeStateAndMaybePlay()
       } catch (e: any) {
         setError(e.message || String(e))
         setStatus('idle')
@@ -149,9 +175,9 @@ function refreshAuxFlags() {
       const room = roomRef.current; if (!room) return
       // publish mic as 'aux'
       const [audioTrack] = await createLocalTracks({ audio: true })
-      // tag the track name via publish options
       await room.localParticipant.publishTrack(audioTrack as LocalAudioTrack, { name: 'aux' })
       setStatus('publishing'); setIHaveAux(true)
+      computeStateAndMaybePlay()
     } catch (e: any) { setError(e.message || String(e)) }
   }
 
@@ -164,6 +190,7 @@ function refreshAuxFlags() {
       if (!track) throw new Error('No audio track from display capture')
       await room.localParticipant.publishTrack(track, { name: 'aux' })
       setStatus('publishing'); setIHaveAux(true)
+      computeStateAndMaybePlay()
     } catch (e: any) { setError(e.message || String(e)) }
   }
 
@@ -174,83 +201,100 @@ function refreshAuxFlags() {
     setStatus('connected')
     // also close collab if it was allowed
     if (collabAllowed) await setCollabAllowedByController(false)
+    computeStateAndMaybePlay()
   }
 
-function toggleListen() {
-  setIsListening(v => {
-    const next = !v
+  function toggleListen() {
+    setIsListening(v => {
+      const next = !v
+      if (audioElRef.current) {
+        audioElRef.current.muted = !next
+        if (next) audioElRef.current.play().catch(() => {/* ignore */})
+      }
+      return next
+    })
+  }
+
+  async function listenNow() {
+    const room = roomRef.current; if (!room) return
+    try {
+      await room.startAudio() // satisfy autoplay policies
+    } catch {}
     if (audioElRef.current) {
-      audioElRef.current.muted = !next
-      if (next) audioElRef.current.play().catch(() => {/* ignore */})
+      audioElRef.current.muted = false
+      try { await audioElRef.current.play() } catch {}
     }
-    return next
-  })
-}
+    setIsListening(true)
+  }
 
   // Collab controls (controlled by aux holder)
-async function setCollabAllowedByController(allowed: boolean) {
-  const room = roomRef.current; if (!room) return
-  if (!iHaveAux) { setError('Only the aux holder can change collab'); return }
-
-  setCollabAllowed(allowed)
-
-  const enc = new TextEncoder()
-
-  // announce allowed/closed state
-  const allowMsg = { type: 'collab:allow', allowed }
-  await room.localParticipant.publishData(enc.encode(JSON.stringify(allowMsg)), { reliable: true })
-
-  // if closing, tell any collaborator to stop
-  if (!allowed) {
-    const closeMsg = { type: 'collab:close' }
-    await room.localParticipant.publishData(enc.encode(JSON.stringify(closeMsg)), { reliable: true })
-  }
-}
-
-async function takeAuxFile() {
-  try {
+  async function setCollabAllowedByController(allowed: boolean) {
     const room = roomRef.current; if (!room) return
+    if (!iHaveAux) { setError('Only the aux holder can change collab'); return }
 
-    // 1) Pick a file
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'audio/*'
-    input.onchange = async () => {
-      const file = input.files?.[0]; if (!file) return
-      const url = URL.createObjectURL(file)
+    setCollabAllowed(allowed)
 
-      // 2) Create an <audio> element and a WebAudio graph
-      const el = new Audio(url)
-      el.loop = false
-      await el.play().catch(() => {/* user gesture might be needed */})
+    const enc = new TextEncoder()
 
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const src = ctx.createMediaElementSource(el)
-      const dest = ctx.createMediaStreamDestination()  // <-- gives us a MediaStream track
-      src.connect(dest)
-      src.connect(ctx.destination) // also play locally
+    // announce allowed/closed state
+    const allowMsg = { type: 'collab:allow', allowed }
+    await room.localParticipant.publishData(enc.encode(JSON.stringify(allowMsg)), { reliable: true })
 
-      const track = dest.stream.getAudioTracks()[0]
-      await room.localParticipant.publishTrack(track, { name: 'aux' })
-      setStatus('publishing'); setIHaveAux(true)
-
-      // when the song ends, clean up
-      el.onended = () => {
-        const pubs = room.localParticipant.getTrackPublications()
-        const pub = pubs.find(p => p.trackName === 'aux')
-        if (pub) {
-          const sid = (pub as any).trackSid ?? (pub as any).sid
-          room.localParticipant.unpublishTrack(sid, true)
-        }
-        track.stop()
-        ctx.close()
-        setStatus('connected'); setIHaveAux(false)
-      }
+    // if closing, tell any collaborator to stop
+    if (!allowed) {
+      const closeMsg = { type: 'collab:close' }
+      await room.localParticipant.publishData(enc.encode(JSON.stringify(closeMsg)), { reliable: true })
     }
-    input.click()
-  } catch (e:any) { setError(e.message || String(e)) }
-}
 
+    computeStateAndMaybePlay()
+  }
+
+  async function takeAuxFile() {
+    try {
+      const room = roomRef.current; if (!room) return
+
+      // 1) Pick a file
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'audio/*'
+      input.onchange = async () => {
+        const file = input.files?.[0]; if (!file) return
+        const url = URL.createObjectURL(file)
+
+        // 2) Create an <audio> element and a WebAudio graph
+        const el = new Audio(url)
+        el.loop = false
+        await el.play().catch(() => {/* user gesture might be needed */})
+
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+        const src = ctx.createMediaElementSource(el)
+        const dest = ctx.createMediaStreamDestination()  // <-- gives us a MediaStream track
+        src.connect(dest)
+        src.connect(ctx.destination) // also play locally
+
+        const track = dest.stream.getAudioTracks()[0]
+        await room.localParticipant.publishTrack(track, { name: 'aux' })
+        setStatus('publishing'); setIHaveAux(true)
+
+        computeStateAndMaybePlay()
+
+        // when the song ends, clean up
+        el.onended = () => {
+          const pubs = room.localParticipant.getTrackPublications()
+          const pub = pubs.find(p => p.trackName === 'aux')
+          if (pub) {
+            const sid = (pub as any).trackSid ?? (pub as any).sid
+            room.localParticipant.unpublishTrack(sid, true)
+          }
+          track.stop()
+          ctx.close()
+          setStatus('connected'); setIHaveAux(false)
+          computeStateAndMaybePlay()
+        }
+      }
+      input.click()
+    } catch (e: any) { setError(e.message || String(e)) }
+  }
 
   async function joinCollab() {
     try {
@@ -262,6 +306,7 @@ async function takeAuxFile() {
       await room.localParticipant.publishTrack(audioTrack as LocalAudioTrack, { name: 'collab' })
       setStatus('publishing')
       setCollabOccupied(true)
+      computeStateAndMaybePlay()
     } catch (e: any) { setError(e.message || String(e)) }
   }
 
@@ -310,7 +355,11 @@ async function takeAuxFile() {
           <button onClick={takeAuxTab} disabled={!canTakeAux}>Take the Aux (Share Tab)</button>
           <button onClick={passAux} disabled={!canPassAux}>Pass the Aux</button>
           <button onClick={takeAuxFile} disabled={!canTakeAux}>Take the Aux (Play File)</button>
-
+          <button onClick={listenNow} disabled={isListening}>Listen</button>
+          <button onClick={() => {
+            if (audioElRef.current) audioElRef.current.muted = true
+            setIsListening(false)
+          }}>Mute</button>
         </div>
 
         {/* Row 3: Collab controls */}
@@ -329,7 +378,7 @@ async function takeAuxFile() {
 
         <p style={{ fontSize: 12, opacity: 0.7, marginTop: 10, lineHeight: 1.4 }}>
           “Take the Aux” publishes your mic or tab audio to the room. “Pass the Aux” stops your aux track.
-          The aux holder can open a single **Collab** slot so another person can publish a second mic (beats + vocals).
+          The aux holder can open a single <strong>Collab</strong> slot so another person can publish a second mic (beats + vocals).
         </p>
       </div>
     </main>
