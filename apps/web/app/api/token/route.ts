@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AccessToken } from 'livekit-server-sdk'
 
-export const runtime = 'nodejs' // required: server SDK needs Node, not Edge
+export const runtime = 'nodejs'
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,19 +15,13 @@ export async function GET(req: NextRequest) {
 
     const apiKey = process.env.LIVEKIT_API_KEY
     const apiSecret = process.env.LIVEKIT_API_SECRET
-    const lkUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL // client uses this to connect
+    const lkUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL
 
     if (!apiKey || !apiSecret || !lkUrl) {
-      return NextResponse.json(
-        { error: 'LiveKit env vars not set' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'LiveKit env vars not set' }, { status: 500 })
     }
 
-    const at = new AccessToken(apiKey, apiSecret, {
-      identity,
-      // optional metadata: metadata: JSON.stringify({ role: 'guest' })
-    })
+    const at = new AccessToken(apiKey, apiSecret, { identity })
     at.addGrant({
       room: roomName,
       roomJoin: true,
