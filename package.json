@@ -11,7 +11,7 @@
     "dev:web": "npm --workspace apps/web run dev",
     "dev:signaling": "npm --workspace services/signaling run dev",
     "dev:mobile": "npm --workspace apps/mobile run start",
-    "build": "npm -w apps/web run build && npm -w services/signaling run build",
+    "build": "npm -w apps/web run build",
     "start": "npm -w apps/web run start"
   }
 }
