@@ -3,6 +3,23 @@
 @tailwind utilities;
 
 
+
+:root{
+  /* pull from your board: deep maroon, safety red, electric violet, golden yellow, ink */
+  --aa-yellow: #F2D335;   /* poster yellow */
+  --aa-maroon: #3A0D12;   /* deep wine */
+  --aa-red:    #F03A1E;   /* safety red/orange */
+  --aa-violet: #6A5CF7;   /* electric violet */
+  --aa-ink:    #1A0E0F;   /* near-black maroon */
+}
+
+/* subtle CRT scanlines for the header */
+.scanlines{
+  background-image:
+    linear-gradient(rgba(0,0,0,.12) 50%, rgba(0,0,0,0) 50%);
+  background-size: 100% 2px;
+}
+
 body {
   @apply bg-black text-gray-200; /* full black background */
   font-family: 'Orbitron', sans-serif; /* optional PS2-style font */

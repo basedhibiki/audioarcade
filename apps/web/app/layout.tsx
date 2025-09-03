@@ -1,7 +1,8 @@
 // apps/web/app/layout.tsx
 import type { Metadata } from 'next'
 import React from 'react'
-
+import './globals.css';
+import XMBNavCvS2 from './components/XMBNavCvS2';
 export const metadata: Metadata = { title: 'Audio Arcade' }
 import './globals.css'
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -10,4 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ fontFamily: 'Inter, system-ui' }}>{children}</body>
     </html>
   )
+  
 }
+
+
