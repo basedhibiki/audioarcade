@@ -9,9 +9,15 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
-    "expo": "~51.0.0",
-    "react": "18.2.0",
-    "react-native": "0.74.2",
-    "socket.io-client": "^4.7.5"
+    "@livekit/react-native": "^2.9.1",
+    "expo": "^53.0.22",
+    "expo-dev-client": "~5.2.4",
+    "livekit-client": "^2.15.6",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-permissions": "^5.4.2",
+    "react-native-webrtc": "^124.0.6",
+    "socket.io-client": "^4.7.5",
+    "typescript": "~5.8.3"
   }
 }
