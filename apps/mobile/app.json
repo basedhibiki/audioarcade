@@ -2,22 +2,32 @@
   "expo": {
     "name": "AudioArcade",
     "slug": "audioarcade",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "scheme": "audioarcade",
+    "icon": "./assets/icon.png",
     "android": {
-      "package": "com.raregod.audioarcade",
-      "permissions": [],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      }
-    },
-    "extra": {
-      "eas": {
-        "projectId": "c9771a53-de05-4124-9212-5f1f8fa99e60"
-      }
+        "backgroundColor": "#FFFFFF",
+        "package": "com.basedhibiki.audioarcade",
+        "permissions": [
+          "INTERNET",
+          "RECORD_AUDIO",
+          "MODIFY_AUDIO_SETTINGS",
+          "BLUETOOTH",
+          "BLUETOOTH_CONNECT",
+          "INTERNET",
+          "RECORD_AUDIO",
+          "MODIFY_AUDIO_SETTINGS",
+          "BLUETOOTH",
+          "BLUETOOTH_CONNECT"
+        ]
+      },
+      "extra": {
+        "eas": {
+          "projectId": "c9771a53-de05-4124-9212-5f1f8fa99e60"
+        }
+      },
+      "package": "com.basedhibiki.audioarcade"
     }
   }
 }

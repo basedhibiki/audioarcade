@@ -17,8 +17,8 @@ import {
 // keep this AFTER registerGlobals() (shown above)
 
 
-const LIVEKIT_URL = 'wss://YOUR-PROJECT.livekit.cloud' // <-- same as web NEXT_PUBLIC_LIVEKIT_URL
-const API_BASE = 'https://YOUR-VERCEL-APP.vercel.app'  // <-- your deployed web app domain
+const LIVEKIT_URL = 'wss://audioarcade-6z6poxqe.livekit.cloud' // <-- same as web NEXT_PUBLIC_LIVEKIT_URL
+const API_BASE = 'https://audioarcade-web.vercel.app'  // <-- your deployed web app domain
 
 type ControlMsg =
   | { type: 'collab:allow'; allowed: boolean }
