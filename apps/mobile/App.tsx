@@ -1,12 +1,11 @@
-import React from 'react'
-import { SafeAreaView } from 'react-native'
-import ChannelScreen from './src/ChannelScreen'
+﻿import { StatusBar } from "expo-status-bar";
+import { Text, View } from "react-native";
 
-// simple: hardcode a room while testing
 export default function App() {
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ChannelScreen roomName="demo" />
-    </SafeAreaView>
-  )
+    <View style={{ flex:1, alignItems:"center", justifyContent:"center" }}>
+      <Text>Audio Arcade</Text>
+      <StatusBar style="auto" />
+    </View>
+  );
 }

@@ -1,23 +1,52 @@
 {
-  "name": "@audio-arcade/mobile",
-  "version": "0.1.0",
+  "name": "mobile",
+  "version": "1.0.0",
   "private": true,
-  "main": "index.js",
+  "main": "expo/AppEntry",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "prebuild": "expo prebuild --clean"
   },
   "dependencies": {
     "@livekit/react-native": "^2.9.1",
-    "expo": "^53.0.22",
+    "@livekit/react-native-webrtc": "^137.0.1",
+    "expo": "^53.0.0",
     "expo-dev-client": "~5.2.4",
+    "expo-status-bar": "~2.0.0",
     "livekit-client": "^2.15.6",
     "react": "19.0.0",
     "react-native": "0.79.5",
-    "react-native-permissions": "^5.4.2",
-    "react-native-webrtc": "^124.0.6",
-    "socket.io-client": "^4.7.5",
+    "react-native-webrtc": "^118.0.0",
+    "socket": {
+      "io-client": "^4.7.5"
+    },
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
     "typescript": "~5.8.3"
+  },
+  "overrides": {
+    "metro": "^0.82.0",
+    "metro-config": "^0.82.0",
+    "metro-resolver": "^0.82.0"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "@livekit/react-native",
+          "react-native-webrtc",
+          "socket.io-client",
+          "typescript"
+        ],
+        "listUnknownPackages": false
+      }
+    }
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
