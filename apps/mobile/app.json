@@ -4,39 +4,38 @@
     "slug": "audioarcade",
     "scheme": "audioarcade",
     "icon": "./assets/icon.png",
+
+    "plugins": [
+      "@livekit/react-native-expo-plugin"
+    ],
+
     "android": {
+      "package": "com.basedhibiki.audioarcade",
+      "permissions": [
+        "INTERNET",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "BLUETOOTH",
+        "BLUETOOTH_CONNECT"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF",
-        "package": "com.basedhibiki.audioarcade",
-        "permissions": [
-          "INTERNET",
-          "RECORD_AUDIO",
-          "MODIFY_AUDIO_SETTINGS",
-          "BLUETOOTH",
-          "BLUETOOTH_CONNECT",
-          "INTERNET",
-          "RECORD_AUDIO",
-          "MODIFY_AUDIO_SETTINGS",
-          "BLUETOOTH",
-          "BLUETOOTH_CONNECT"
-        ]
-      },
-      "extra": {
-        "eas": {
-          "projectId": "c9771a53-de05-4124-9212-5f1f8fa99e60"
-        }
-      },
-      "package": "com.basedhibiki.audioarcade"
+        "backgroundColor": "#FFFFFF"
+      }
     },
+
+    "ios": {
+      "bundleIdentifier": "com.basedhibiki.audioarcade",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Audio Arcade needs microphone access for streaming.",
+        "UIBackgroundModes": [ "audio" ]
+      }
+    },
+
     "extra": {
       "eas": {
         "projectId": "c9771a53-de05-4124-9212-5f1f8fa99e60"
       }
-    },
-    "plugins": [
-      "@livekit/react-native-expo-plugin",
-      "@config-plugins/react-native-webrtc"
-    ]
+    }
   }
 }

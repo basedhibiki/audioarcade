@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@livekit/react-native": "^2.9.1",
+    "@livekit/react-native-expo-plugin": "^1.0.1",
     "@livekit/react-native-webrtc": "^137.0.1",
     "expo": "^53.0.0",
     "expo-dev-client": "~5.2.4",
@@ -19,33 +20,12 @@
     "livekit-client": "^2.15.6",
     "react": "19.0.0",
     "react-native": "0.79.5",
-    "react-native-webrtc": "^118.0.0",
-    "socket": {
-      "io-client": "^4.7.5"
-    },
     "socket.io-client": "^4.7.5"
   },
   "devDependencies": {
     "typescript": "~5.8.3"
   },
-  "overrides": {
-    "metro": "^0.82.0",
-    "metro-config": "^0.82.0",
-    "metro-resolver": "^0.82.0"
-  },
-  "expo": {
-    "doctor": {
-      "reactNativeDirectoryCheck": {
-        "exclude": [
-          "@livekit/react-native",
-          "react-native-webrtc",
-          "socket.io-client",
-          "typescript"
-        ],
-        "listUnknownPackages": false
-      }
-    }
-  },
+
   "engines": {
     "node": ">=18"
   }
