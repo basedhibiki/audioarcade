@@ -1,5 +1,5 @@
 'use client'
-
+import { supabaseBrowser } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase'
 
