@@ -1,73 +1,90 @@
+// apps/web/app/api/token/route.ts
 import { NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 import { z } from "zod";
+import { supabaseServer } from "@/lib/supabase";
 
-export const runtime = "nodejs";         // ensure Node runtime (not edge)
-export const dynamic = "force-dynamic";  // always run server-side
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-// Allow mobile dev to hit this endpoint.
-// In production, set a strict origin list.
-const ALLOWED_ORIGINS = [
-  process.env.NEXT_PUBLIC_WEB_ORIGIN,      // e.g. https://yourdomain.com
-  "http://localhost:3000",                 // next dev
-  "http://localhost:8081",                 // rn dev server (optional)
-  "http://127.0.0.1:3000"
-].filter(Boolean) as string[];
+// Admins (comma-separated emails in .env)
+const admins = new Set(
+  (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
 
+// ---- CORS (dev: allow all) ----
 function cors(res: NextResponse) {
-  res.headers.set("Access-Control-Allow-Origin", ALLOWED_ORIGINS.join(",") || "*");
+  res.headers.set("Access-Control-Allow-Origin", "*");
   res.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.headers.set("Access-Control-Max-Age", "86400");
   return res;
 }
-
 export async function OPTIONS() {
   return cors(new NextResponse(null, { status: 204 }));
 }
 
+// ---- Body schema ----
 const BodySchema = z.object({
   room: z.string().min(1),
-  identity: z.string().min(1),
-  role: z.enum(["admin", "host", "participant", "audience"]).default("participant")
+  identity: z.string().min(1).optional(),
+  role: z.enum(["admin", "host", "participant", "audience"]).default("participant"),
 });
 
 export async function POST(req: Request) {
-  // Validate env
+  // 1) Validate env
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
   if (!apiKey || !apiSecret) {
     return cors(
-      NextResponse.json({ error: "LIVEKIT_API_KEY/SECRET missing" }, { status: 500 })
+      NextResponse.json(
+        { error: "LIVEKIT_API_KEY/SECRET missing" },
+        { status: 500 }
+      )
     );
   }
 
-  // Parse body
+  // 2) Parse body (Zod)
   let body: z.infer<typeof BodySchema>;
   try {
     body = BodySchema.parse(await req.json());
-  } catch (e) {
+  } catch {
     return cors(NextResponse.json({ error: "Invalid body" }, { status: 400 }));
   }
+  const room = String(body.room);
+  const requestedRole = body.role;
+  const identityFromClient = body.identity;
 
-  const { room, identity, role } = body;
+  // 3) Get Supabase user (for email + admin check)
+  const supabase = supabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const email = user?.email ?? null;
+  const isAdmin = !!email && admins.has(email);
 
-  // Build token
-  const at = new AccessToken(apiKey, apiSecret, {
-    identity,
-    ttl: "1h" // adjust if needed
-  });
+  // 4) Choose identity and grants
+  const identity =
+    identityFromClient ??
+    email ??
+    "guest_" + Math.random().toString(36).slice(2);
 
-  // Grant room permissions (tune to your alpha rules)
+  const at = new AccessToken(apiKey, apiSecret, { identity, ttl: "1h" });
+
   at.addGrant({
     room,
     roomJoin: true,
-    canPublish: true,      // set false for listeners
     canSubscribe: true,
-    // canPublishSources: ["microphone"], // optionally restrict sources
-    // canUpdateOwnMetadata: true,
+    // Allow publish if admin or host/participant (tune as needed)
+    canPublish: isAdmin || requestedRole === "host" || requestedRole === "participant",
+    // Example: restrict sources later (music bot, etc.)
+    // canPublishSources: ["microphone"],
   });
 
+  // 5) Mint & return token
   const token = await at.toJwt();
-  return cors(NextResponse.json({ token }, { status: 200 }));
+  return cors(NextResponse.json({ token, isAdmin, email }, { status: 200 }));
 }
