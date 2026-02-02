@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import '@livekit/components-styles/dist/styles.css';
+import '@livekit/components-styles';
 
 export default function Home() {
   const router = useRouter()
