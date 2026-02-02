@@ -9,12 +9,14 @@
     "start": "next start"
   },
   "dependencies": {
-    "@livekit/components-react": "^2.9.14",
+    "@livekit/components-react": "^2.9.19",
+    "@livekit/components-styles": "^1.2.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
-    "@supabase/supabase-js": "^2.57.4",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.93.3",
     "livekit-client": "^2.15.6",
     "livekit-server-sdk": "^2.13.3",
-    "next": "^14.2.32",
+    "next": "^16.1.6",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "socket.io-client": "^4.7.5",

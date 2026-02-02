@@ -1,0 +1,103 @@
+diff --git a/apps/web/next.config.cjs b/apps/web/next.config.cjs
+index 1111111..2222222 100644
+--- a/apps/web/next.config.cjs
++++ b/apps/web/next.config.cjs
+@@ -1,14 +1,18 @@
+-export default { reactStrictMode: true };
+ /** @type {import('next').NextConfig} */
+ const base = {
++  reactStrictMode: true,
+   swcMinify: true,
+   productionBrowserSourceMaps: false,
+   experimental: {
+     // better tree-shaking for deps
+     optimizePackageImports: ['livekit-client'],
+   },
+ };
+ 
+ if (process.env.ANALYZE === 'true') {
+   const withAnalyzer = require('@next/bundle-analyzer')({
+     enabled: true,
+   });
+   module.exports = withAnalyzer(base);
+ } else {
+   module.exports = base;
+ }
+diff --git a/apps/web/lib/supabase/index.ts b/apps/web/lib/supabase/index.ts
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/apps/web/lib/supabase/index.ts
+@@ -0,0 +1,10 @@
++// apps/web/lib/supabase/index.ts
++// Barrel exports so `@/lib/supabase` works in Route Handlers.
++
++export { createServerSupabase as supabaseServer } from './server';
++export { createBrowserSupabase as supabaseBrowser } from './client';
++
++export { createServerSupabase } from './server';
++export { createBrowserSupabase } from './client';
+diff --git a/apps/web/lib/supabase/client.ts b/apps/web/lib/supabase/client.ts
+index 4444444..5555555 100644
+--- a/apps/web/lib/supabase/client.ts
++++ b/apps/web/lib/supabase/client.ts
+@@ -1,13 +1,12 @@
+ // apps/web/lib/supabase/client.ts
+ 'use client';
+ 
+ import { createClient } from '@supabase/supabase-js';
+-import { createBrowserClient } from '@supabase/ssr'
+-
+-
+-
+ 
+ export function createBrowserSupabase() {
+   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+   return createClient(url, anonKey);
+ }
++
++// Backwards-compatible alias (your Channel page imports this name)
++export const supabaseBrowser = createBrowserSupabase;
+diff --git a/apps/web/lib/supabase/server.ts b/apps/web/lib/supabase/server.ts
+index 6666666..7777777 100644
+--- a/apps/web/lib/supabase/server.ts
++++ b/apps/web/lib/supabase/server.ts
+@@ -1,6 +1,7 @@
+ // apps/web/lib/supabase/server.ts
+ import { cookies } from 'next/headers';
+ import { createServerClient } from '@supabase/ssr';
+ 
+ export function createServerSupabase() {
+   const cookieStore = cookies();
+@@ -23,3 +24,6 @@ export function createServerSupabase() {
+       set: (name: string, value: string, options: any) =>
+         cookieStore.set({ name, value, ...options }),
+     },
+   });
+ }
++
++// Backwards-compatible alias (Route Handlers call supabaseServer())
++export const supabaseServer = createServerSupabase;
+diff --git a/apps/web/app/channel/[slug]/page.tsx b/apps/web/app/channel/[slug]/page.tsx
+index 8888888..9999999 100644
+--- a/apps/web/app/channel/[slug]/page.tsx
++++ b/apps/web/app/channel/[slug]/page.tsx
+@@ -1,6 +1,6 @@
+ 'use client'
+-import { supabaseBrowser } from '@/lib/supabase/client'
++import { supabaseBrowser } from '@/lib/supabase'
+ import { useEffect, useState } from 'react'
+ import {
+   LiveKitRoom,
+@@ -8,7 +8,7 @@ import {
+   useParticipants,
+   useDataChannel,
+   RoomAudioRenderer,
+ } from '@livekit/components-react'
+-import '@livekit/components-styles'
++import '@livekit/components-styles'
+ 
+ export default function ChannelPage({ params }: { params: { slug: string } }) {
+   const roomName = params.slug
+   const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL!

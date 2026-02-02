@@ -1,15 +1,21 @@
 'use client'
-import { supabaseBrowser } from '@/lib/supabase/client'
-import { useEffect, useState } from 'react'
-import { supabaseBrowser } from '@/lib/supabase'
+
+import { useEffect, useMemo, useState } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 
 export default function LoginPage() {
-  const supabase = supabaseBrowser()
+  // Create the client once (not every render)
+  const supabase = useMemo(() => {
+    return createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  }, [])
+
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<'idle' | 'sent' | 'error'>('idle')
 
   useEffect(() => {
-    // Keep session fresh in client
     supabase.auth.getSession()
   }, [supabase])
 
@@ -17,10 +23,11 @@ export default function LoginPage() {
     try {
       await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: window.location.origin }
+        options: { emailRedirectTo: window.location.origin },
       })
       setStatus('sent')
-    } catch {
+    } catch (e) {
+      console.error(e)
       setStatus('error')
     }
   }
