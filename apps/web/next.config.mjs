@@ -1,3 +1,4 @@
+Set-Content -Path .\apps\web\next.config.mjs -Value @"
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -9,3 +10,4 @@ const nextConfig = {
 };
 
 export default nextConfig;
+"@
