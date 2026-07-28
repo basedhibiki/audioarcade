@@ -1,7 +1,6 @@
 // apps/web/app/api/livekit/route.ts
 import { NextRequest } from 'next/server'
 import { AccessToken } from 'livekit-server-sdk'
-import '@livekit/components-styles/dist/styles.css';
 
 
 export async function GET(req: NextRequest) {

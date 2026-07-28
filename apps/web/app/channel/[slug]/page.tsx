@@ -1,118 +1,486 @@
 'use client'
-import { supabaseBrowser } from '@/lib/supabase/client'
-import { useEffect, useState } from 'react'
+
 import {
   LiveKitRoom,
-  useRoomContext,
-  useParticipants,
-  useDataChannel,
   RoomAudioRenderer,
+  useConnectionState,
+  useParticipants,
+  useRoomContext,
 } from '@livekit/components-react'
-import '@livekit/components-styles'
+import {
+  ConnectionState,
+  LocalParticipant,
+  Participant,
+  RoomEvent,
+} from 'livekit-client'
+import { FormEvent, use, useEffect, useMemo, useState } from 'react'
 
-export default function ChannelPage({ params }: { params: { slug: string } }) {
-  const roomName = params.slug
-  const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL!
+type JoinState = {
+  displayName: string
+  token: string
+}
 
-  async function getToken() {
-    const r = await fetch('/api/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        room: roomName,
-        identity: 'web_' + Math.random().toString(36).slice(2),
-      }),
-    })
-    const { token } = await r.json()
-    return token
+type AudioDevice = {
+  deviceId: string
+  label: string
+}
+
+const AUX_ATTRIBUTE = 'audioArcadeAuxClaim'
+
+function normaliseName(value: string) {
+  return value.replace(/\s+/g, ' ').trim().slice(0, 32)
+}
+
+function participantName(participant: Participant | LocalParticipant) {
+  return participant.name || participant.identity
+}
+
+function auxClaim(participant: Participant | LocalParticipant) {
+  const raw = participant.attributes?.[AUX_ATTRIBUTE]
+  if (!raw) return null
+  const timestamp = Number(raw)
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
+export default function ChannelPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug: roomName } = use(params)
+  const serverUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL
+  const [joinState, setJoinState] = useState<JoinState | null>(null)
+  const [joining, setJoining] = useState(false)
+  const [joinError, setJoinError] = useState('')
+
+  async function join(displayName: string, password: string) {
+    const cleanName = normaliseName(displayName)
+    if (!cleanName || !serverUrl) return
+
+    setJoining(true)
+    setJoinError('')
+
+    try {
+      const response = await fetch('/api/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ room: roomName, displayName: cleanName, password }),
+      })
+      const payload = await response.json()
+
+      if (!response.ok || !payload.token) {
+        throw new Error(payload.error || 'Could not join the room.')
+      }
+
+      window.localStorage.setItem('audio-arcade-display-name', cleanName)
+      setJoinState({ displayName: cleanName, token: payload.token })
+    } catch (error) {
+      setJoinError(error instanceof Error ? error.message : 'Could not join the room.')
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  if (!serverUrl) {
+    return (
+      <main className="aa-page aa-centred">
+        <section className="aa-card aa-join-card">
+          <p className="aa-kicker">Configuration error</p>
+          <h1>Audio Arcade cannot connect</h1>
+          <p>NEXT_PUBLIC_LIVEKIT_URL is missing from the deployment environment.</p>
+        </section>
+      </main>
+    )
+  }
+
+  if (!joinState) {
+    return (
+      <JoinScreen
+        roomName={roomName}
+        joining={joining}
+        error={joinError}
+        onJoin={join}
+      />
+    )
   }
 
   return (
-    <LiveKitRoom serverUrl={serverUrl} tokenGetter={getToken} connect>
-      <RoomShell roomName={roomName} />
+    <LiveKitRoom
+      serverUrl={serverUrl}
+      token={joinState.token}
+      connect
+      audio={false}
+      video={false}
+      options={{ adaptiveStream: true, dynacast: true }}
+      onDisconnected={() => setJoinState(null)}
+      onError={(error) => setJoinError(error.message)}
+    >
+      <RoomShell roomName={roomName} displayName={joinState.displayName} />
       <RoomAudioRenderer />
     </LiveKitRoom>
   )
 }
 
-function RoomShell({ roomName }: { roomName: string }) {
-  const room = useRoomContext()
-  const { participants } = useParticipants()
-  const data = useDataChannel()
-  const [log, setLog] = useState<string[]>([])
-  const [msg, setMsg] = useState('')
+function JoinScreen({
+  roomName,
+  joining,
+  error,
+  onJoin,
+}: {
+  roomName: string
+  joining: boolean
+  error: string
+  onJoin: (displayName: string, password: string) => Promise<void>
+}) {
+  const [displayName, setDisplayName] = useState('')
+  const [password, setPassword] = useState('')
 
   useEffect(() => {
-    if (!data) return
-    const onMsg = (_p: any, m: Uint8Array) => {
-      const t = new TextDecoder().decode(m)
-      setLog((l) => [...l.slice(-99), t])
-    }
-    data.on('message', onMsg)
-    return () => {
-      data.off('message', onMsg)
-    }
-  }, [data])
+    setDisplayName(window.localStorage.getItem('audio-arcade-display-name') || '')
+  }, [])
 
-  function sendChat() {
-    if (!msg.trim()) return
-    const payload = {
-      t: 'chat',
-      from: room.localParticipant?.identity,
-      text: msg.trim(),
-    }
-    data?.publish(new TextEncoder().encode(JSON.stringify(payload)))
-    setMsg('')
-  }
-
-  function requestAux() {
-    const payload = {
-      t: 'request-aux',
-      from: room.localParticipant?.identity,
-    }
-    data?.publish(new TextEncoder().encode(JSON.stringify(payload)))
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void onJoin(displayName, password)
   }
 
   return (
-    <div className="grid grid-cols-3 h-screen">
-      <div className="col-span-2 p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="font-semibold">Room: {roomName}</div>
-          <button className="px-3 py-2 border rounded" onClick={requestAux}>
-            Request Aux
-          </button>
-        </div>
-        <div>
-          <div className="font-semibold mb-1">Participants</div>
-          <ul className="text-sm">
-            {[room.localParticipant, ...participants]
-              .filter(Boolean)
-              .map((p: any) => (
-                <li key={p.identity}>{p.name ?? p.identity}</li>
-              ))}
-          </ul>
-        </div>
-      </div>
+    <main className="aa-page aa-centred">
+      <section className="aa-card aa-join-card">
+        <div className="aa-logo-mark">AA</div>
+        <p className="aa-kicker">Discord beta</p>
+        <h1>Enter Audio Arcade</h1>
+        <p className="aa-room-name">Room / {roomName}</p>
+        <p className="aa-muted">
+          Stay in Discord for voice chat. Use this room only for the music feed and wear
+          headphones to avoid feedback.
+        </p>
 
-      <div className="border-l p-4 flex flex-col">
-        <div className="font-semibold mb-2">Chat</div>
-        <div className="flex-1 overflow-auto text-sm border rounded p-2 bg-white/30">
-          {log.map((l, i) => (
-            <div key={i}>{l}</div>
-          ))}
-        </div>
-        <div className="mt-2 flex gap-2">
+        <form className="aa-form" onSubmit={submit}>
+          <label htmlFor="displayName">Display name</label>
           <input
-            className="flex-1 border p-2 rounded"
-            value={msg}
-            onChange={(e) => setMsg(e.target.value)}
-            placeholder="Type message…"
+            id="displayName"
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            maxLength={32}
+            autoComplete="nickname"
+            placeholder="Your Discord name"
+            autoFocus
           />
-          <button className="px-3 py-2 border rounded" onClick={sendChat}>
-            Send
+          <label htmlFor="roomPassword">Room password</label>
+          <input
+            id="roomPassword"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+            placeholder="Enter room password"
+          />
+          {error ? <p className="aa-error">{error}</p> : null}
+          <button type="submit" className="aa-primary" disabled={joining || !normaliseName(displayName) || !password}>
+            {joining ? 'Connecting…' : 'Join room'}
           </button>
+        </form>
+
+        <div className="aa-beta-note">
+          <strong>Best results:</strong> Chrome desktop, wired headphones and your audio
+          interface selected as the input.
         </div>
+      </section>
+    </main>
+  )
+}
+
+function RoomShell({ roomName, displayName }: { roomName: string; displayName: string }) {
+  const room = useRoomContext()
+  const connectionState = useConnectionState()
+  const participants = useParticipants()
+  const [devices, setDevices] = useState<AudioDevice[]>([])
+  const [selectedDevice, setSelectedDevice] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('Choose an input, then take AUX when it is free.')
+  const [deviceError, setDeviceError] = useState('')
+  const [, forceParticipantRefresh] = useState(0)
+
+  const allParticipants = useMemo(() => {
+    const unique = new Map<string, Participant | LocalParticipant>()
+
+    for (const participant of [room.localParticipant, ...participants]) {
+      const key = participant.identity || participant.sid
+      if (key) unique.set(key, participant)
+    }
+
+    return Array.from(unique.values())
+  }, [room.localParticipant, participants])
+
+  const holder = useMemo(() => {
+    return allParticipants
+      .map((participant) => ({ participant, claim: auxClaim(participant) }))
+      .filter((entry): entry is { participant: Participant | LocalParticipant; claim: number } => entry.claim !== null)
+      .sort((a, b) => a.claim - b.claim || a.participant.identity.localeCompare(b.participant.identity))[0]
+      ?.participant ?? null
+  }, [allParticipants])
+
+  const iHaveAux = holder?.identity === room.localParticipant.identity
+  const auxAvailable = !holder
+  const isConnected = connectionState === ConnectionState.Connected
+  const isPublishing = room.localParticipant.isMicrophoneEnabled
+
+  useEffect(() => {
+    const refresh = () => forceParticipantRefresh((value) => value + 1)
+    room.on(RoomEvent.ParticipantAttributesChanged, refresh)
+    room.on(RoomEvent.ParticipantConnected, refresh)
+    room.on(RoomEvent.ParticipantDisconnected, refresh)
+    room.on(RoomEvent.LocalTrackPublished, refresh)
+    room.on(RoomEvent.LocalTrackUnpublished, refresh)
+
+    return () => {
+      room.off(RoomEvent.ParticipantAttributesChanged, refresh)
+      room.off(RoomEvent.ParticipantConnected, refresh)
+      room.off(RoomEvent.ParticipantDisconnected, refresh)
+      room.off(RoomEvent.LocalTrackPublished, refresh)
+      room.off(RoomEvent.LocalTrackUnpublished, refresh)
+    }
+  }, [room])
+
+  useEffect(() => {
+    void refreshDevices()
+
+    const handleDeviceChange = () => void refreshDevices()
+    navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange)
+    return () => navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange)
+  }, [])
+
+  useEffect(() => {
+    if (!iHaveAux && isPublishing) {
+      void room.localParticipant.setMicrophoneEnabled(false)
+    }
+  }, [iHaveAux, isPublishing, room.localParticipant])
+
+  useEffect(() => {
+    const releaseBeforeLeaving = () => {
+      if (room.localParticipant.attributes?.[AUX_ATTRIBUTE]) {
+        void room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: '' })
+      }
+    }
+
+    window.addEventListener('beforeunload', releaseBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', releaseBeforeLeaving)
+  }, [room.localParticipant])
+
+  async function refreshDevices() {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setDeviceError('This browser does not support audio device selection.')
+      return
+    }
+
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices()
+      const inputs = list
+        .filter((device) => device.kind === 'audioinput')
+        .map((device, index) => ({
+          deviceId: device.deviceId,
+          label: device.label || `Audio input ${index + 1}`,
+        }))
+      setDevices(inputs)
+      setSelectedDevice((current) => current || inputs[0]?.deviceId || '')
+    } catch {
+      setDeviceError('Allow microphone access to see your audio inputs.')
+    }
+  }
+
+  async function takeAux() {
+    if (!isConnected || busy || holder) return
+    setBusy(true)
+    setDeviceError('')
+
+    try {
+      await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: String(Date.now()) })
+      await new Promise((resolve) => window.setTimeout(resolve, 250))
+
+      const currentClaims = [room.localParticipant, ...Array.from(room.remoteParticipants.values())]
+        .map((participant) => ({ participant, claim: auxClaim(participant) }))
+        .filter((entry): entry is { participant: Participant | LocalParticipant; claim: number } => entry.claim !== null)
+        .sort((a, b) => a.claim - b.claim || a.participant.identity.localeCompare(b.participant.identity))
+
+      if (currentClaims[0]?.participant.identity !== room.localParticipant.identity) {
+        await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: '' })
+        setStatusMessage(`${participantName(currentClaims[0].participant)} took AUX first.`)
+        return
+      }
+
+      if (selectedDevice) {
+        await room.switchActiveDevice('audioinput', selectedDevice)
+      }
+
+      await room.localParticipant.setMicrophoneEnabled(
+        true,
+        {
+          deviceId: selectedDevice || undefined,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+        },
+      )
+
+      await refreshDevices()
+      setStatusMessage('You are live. Pass AUX when your turn is finished.')
+    } catch (error) {
+      await room.localParticipant.setMicrophoneEnabled(false).catch(() => undefined)
+      await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: '' }).catch(() => undefined)
+      setDeviceError(error instanceof Error ? error.message : 'Could not start your audio input.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function passAux() {
+    if (!iHaveAux || busy) return
+    setBusy(true)
+
+    try {
+      await room.localParticipant.setMicrophoneEnabled(false)
+      await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: '' })
+      setStatusMessage('AUX passed. You are listening again.')
+    } catch (error) {
+      setDeviceError(error instanceof Error ? error.message : 'Could not release AUX.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function changeDevice(deviceId: string) {
+    setSelectedDevice(deviceId)
+    setDeviceError('')
+
+    if (!iHaveAux) return
+
+    try {
+      await room.switchActiveDevice('audioinput', deviceId)
+      setStatusMessage('Input changed. Your AUX feed is still live.')
+    } catch (error) {
+      setDeviceError(error instanceof Error ? error.message : 'Could not change audio input.')
+    }
+  }
+
+  return (
+    <main className="aa-page aa-room-page">
+      <header className="aa-room-header">
+        <div>
+          <p className="aa-kicker">Audio Arcade / live room</p>
+          <h1>{roomName}</h1>
+        </div>
+        <div className={`aa-connection aa-connection-${connectionState.toLowerCase()}`}>
+          <span /> {connectionState}
+        </div>
+      </header>
+
+      <div className="aa-room-grid">
+        <section className="aa-card aa-aux-card">
+          <div className="aa-card-heading">
+            <div>
+              <p className="aa-kicker">Current signal</p>
+              <h2>{holder ? participantName(holder) : 'AUX available'}</h2>
+            </div>
+            <div className={`aa-live-light ${holder ? 'is-live' : ''}`} aria-label={holder ? 'AUX live' : 'AUX free'} />
+          </div>
+
+          <div className={`aa-status-panel ${iHaveAux ? 'is-yours' : ''}`}>
+            <strong>
+              {iHaveAux
+                ? 'YOU HAVE AUX'
+                : holder
+                  ? `${participantName(holder).toUpperCase()} IS LIVE`
+                  : 'READY FOR NEXT PLAYER'}
+            </strong>
+            <span>{statusMessage}</span>
+          </div>
+
+          <label className="aa-device-label" htmlFor="audio-device">
+            Audio input
+          </label>
+          <select
+            id="audio-device"
+            value={selectedDevice}
+            onChange={(event) => void changeDevice(event.target.value)}
+            disabled={busy || devices.length === 0}
+          >
+            {devices.length === 0 ? <option value="">No inputs detected</option> : null}
+            {devices.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label}
+              </option>
+            ))}
+          </select>
+          <button className="aa-text-button" type="button" onClick={() => void refreshDevices()}>
+            Refresh inputs
+          </button>
+
+          {deviceError ? <p className="aa-error">{deviceError}</p> : null}
+
+          <div className="aa-actions">
+            <button
+              className="aa-primary aa-take-button"
+              type="button"
+              onClick={() => void takeAux()}
+              disabled={!auxAvailable || !isConnected || busy || !selectedDevice}
+            >
+              {busy && !iHaveAux ? 'Taking AUX…' : 'Take AUX'}
+            </button>
+            <button
+              className="aa-danger"
+              type="button"
+              onClick={() => void passAux()}
+              disabled={!iHaveAux || busy}
+            >
+              {busy && iHaveAux ? 'Passing…' : 'Pass AUX'}
+            </button>
+          </div>
+
+          <div className="aa-signal-row">
+            <span className={isPublishing ? 'is-on' : ''}>Input {isPublishing ? 'live' : 'muted'}</span>
+            <span>Signed in as {displayName}</span>
+          </div>
+        </section>
+
+        <aside className="aa-card aa-participants-card">
+          <div className="aa-card-heading">
+            <div>
+              <p className="aa-kicker">Lobby</p>
+              <h2>Players</h2>
+            </div>
+            <span className="aa-count">{allParticipants.length}</span>
+          </div>
+
+          <ul className="aa-participant-list">
+            {allParticipants.map((participant) => {
+              const participantHasAux = holder?.identity === participant.identity
+              const isLocal = participant.identity === room.localParticipant.identity
+              return (
+                <li key={participant.identity}>
+                  <span className={`aa-avatar ${participantHasAux ? 'is-live' : ''}`}>
+                    {participantName(participant).slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="aa-participant-name">
+                    {participantName(participant)}
+                    {isLocal ? <small>You</small> : null}
+                  </span>
+                  <span className={`aa-participant-state ${participantHasAux ? 'is-live' : ''}`}>
+                    {participantHasAux ? 'AUX' : 'Listening'}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+
+          <div className="aa-help-box">
+            <strong>Beta lobby rules</strong>
+            <ol>
+              <li>Keep Discord open for conversation.</li>
+              <li>Only the AUX holder sends music here.</li>
+              <li>Wear headphones before taking AUX.</li>
+              <li>Pass AUX immediately after your turn.</li>
+            </ol>
+          </div>
+        </aside>
       </div>
-    </div>
+    </main>
   )
 }
