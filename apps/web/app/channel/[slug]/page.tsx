@@ -196,6 +196,8 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
   const [busy, setBusy] = useState(false)
   const [statusMessage, setStatusMessage] = useState('Choose an input, then take AUX when it is free.')
   const [deviceError, setDeviceError] = useState('')
+  const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown')
+  const [requestingPermission, setRequestingPermission] = useState(false)
   const [, forceParticipantRefresh] = useState(0)
 
   const allParticipants = useMemo(() => {
@@ -244,7 +246,35 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
 
     const handleDeviceChange = () => void refreshDevices()
     navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange)
-    return () => navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange)
+
+    let permissionStatus: PermissionStatus | null = null
+
+    async function readPermissionState() {
+      if (!navigator.permissions?.query) return
+
+      try {
+        permissionStatus = await navigator.permissions.query({
+          name: 'microphone' as PermissionName,
+        })
+        setPermissionState(permissionStatus.state)
+
+        permissionStatus.onchange = () => {
+          if (permissionStatus) {
+            setPermissionState(permissionStatus.state)
+            void refreshDevices()
+          }
+        }
+      } catch {
+        setPermissionState('unknown')
+      }
+    }
+
+    void readPermissionState()
+
+    return () => {
+      navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange)
+      if (permissionStatus) permissionStatus.onchange = null
+    }
   }, [])
 
   useEffect(() => {
@@ -286,45 +316,67 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
   }
 
   async function requestAudioPermission() {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error('This browser does not support audio input.')
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('This browser does not support audio input.')
+    }
+
+    setRequestingPermission(true)
+    setDeviceError('')
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      })
+
+      stream.getTracks().forEach((track) => track.stop())
+      setPermissionState('granted')
+      await refreshDevices()
+      setStatusMessage('Audio input enabled. Choose an input, then take AUX.')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        setPermissionState('denied')
+        throw new Error(
+          'Microphone access is blocked. Use the browser site controls to allow microphone access, then press Enable audio input again.',
+        )
+      }
+
+      if (error instanceof DOMException && error.name === 'NotFoundError') {
+        throw new Error('No audio input was found. Connect an input and try again.')
+      }
+
+      throw error
+    } finally {
+      setRequestingPermission(false)
+    }
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-  })
-
-  stream.getTracks().forEach((track) => track.stop())
-  await refreshDevices()
-}
   async function takeAux() {
-
-    
     if (!isConnected || busy || holder) return
+
     setBusy(true)
     setDeviceError('')
 
     try {
-        await requestAudioPermission()
-      await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: String(Date.now()) })
+      await requestAudioPermission()
+
+      await room.localParticipant.setAttributes({
+        [AUX_ATTRIBUTE]: String(Date.now()),
+      })
       await new Promise((resolve) => window.setTimeout(resolve, 250))
 
       const currentClaims = [
-  room.localParticipant,
-  ...Array.from(room.remoteParticipants.values()),
-]
-  .flatMap((participant) => {
-    const claim = auxClaim(participant)
-
-    return claim === null
-      ? []
-      : [{ participant, claim }]
-  })
-  .sort(
-    (a, b) =>
-      a.claim - b.claim ||
-      a.participant.identity.localeCompare(b.participant.identity)
-  )
+        room.localParticipant,
+        ...Array.from(room.remoteParticipants.values()),
+      ]
+        .flatMap((participant) => {
+          const claim = auxClaim(participant)
+          return claim === null ? [] : [{ participant, claim }]
+        })
+        .sort(
+          (a, b) =>
+            a.claim - b.claim ||
+            a.participant.identity.localeCompare(b.participant.identity),
+        )
 
       if (currentClaims[0]?.participant.identity !== room.localParticipant.identity) {
         await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: '' })
@@ -336,23 +388,24 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
         await room.switchActiveDevice('audioinput', selectedDevice)
       }
 
-      await room.localParticipant.setMicrophoneEnabled(
-        true,
-        {
-          deviceId: selectedDevice || undefined,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: 2,
-        },
-      )
+      await room.localParticipant.setMicrophoneEnabled(true, {
+        deviceId: selectedDevice || undefined,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: 2,
+      })
 
       await refreshDevices()
       setStatusMessage('You are live. Pass AUX when your turn is finished.')
     } catch (error) {
       await room.localParticipant.setMicrophoneEnabled(false).catch(() => undefined)
-      await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: '' }).catch(() => undefined)
-      setDeviceError(error instanceof Error ? error.message : 'Could not start your audio input.')
+      await room.localParticipant
+        .setAttributes({ [AUX_ATTRIBUTE]: '' })
+        .catch(() => undefined)
+      setDeviceError(
+        error instanceof Error ? error.message : 'Could not start your audio input.',
+      )
     } finally {
       setBusy(false)
     }
@@ -436,9 +489,33 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
               </option>
             ))}
           </select>
-          <button className="aa-text-button" type="button" onClick={() => void refreshDevices()}>
-            Refresh inputs
-          </button>
+          <div className="aa-input-tools">
+            <button
+              className="aa-text-button"
+              type="button"
+              onClick={() => void requestAudioPermission()}
+              disabled={requestingPermission}
+            >
+              {requestingPermission
+                ? 'Requesting access…'
+                : permissionState === 'granted'
+                  ? 'Audio input enabled'
+                  : 'Enable audio input'}
+            </button>
+
+            <button
+              className="aa-text-button"
+              type="button"
+              onClick={() => void refreshDevices()}
+            >
+              Refresh inputs
+            </button>
+          </div>
+
+          <p className="aa-muted">
+            Permission: {permissionState}. The browser may not show another prompt after a
+            previous Allow or Block decision.
+          </p>
 
           {deviceError ? <p className="aa-error">{deviceError}</p> : null}
 
@@ -447,7 +524,7 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
               className="aa-primary aa-take-button"
               type="button"
               onClick={() => void takeAux()}
-              disabled={!auxAvailable || !isConnected || busy || !selectedDevice}
+              disabled={!auxAvailable || !isConnected || busy}
             >
               {busy && !iHaveAux ? 'Taking AUX…' : 'Take AUX'}
             </button>
