@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { RoomServiceClient } from 'livekit-server-sdk'
-import { supabaseServer } from '@/lib/supabase'
+import { createServerSupabase } from '@/lib/supabase/server'
 
 function cors(res: NextResponse) {
   res.headers.set('Access-Control-Allow-Origin', '*')
@@ -14,7 +14,11 @@ export async function OPTIONS() { return cors(new NextResponse(null, { status: 2
 export async function POST(req: Request) {
   const { room, identity } = await req.json()
 
-  const { data: { user } } = await supabaseServer().auth.getUser()
+  const supabase = await createServerSupabase()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   const admins = new Set((process.env.ADMIN_EMAILS ?? '').split(',').map(s => s.trim()).filter(Boolean))
   if (!user?.email || !admins.has(user.email)) {
     return cors(NextResponse.json({ error: 'forbidden' }, { status: 403 }))
@@ -24,8 +28,20 @@ export async function POST(req: Request) {
     process.env.NEXT_PUBLIC_LIVEKIT_URL!.replace('wss://','https://'),
     process.env.LIVEKIT_API_KEY!, process.env.LIVEKIT_API_SECRET!
   )
-  // Mute all audio tracks for this participant
-  await svc.mutePublishedTrack(room, identity, undefined, true)
+  // Fetch the participant so we can obtain their published track SIDs.
+  const participant = await svc.getParticipant(room, identity)
+  const publishedTracks = participant.tracks ?? []
+
+  await Promise.all(
+    publishedTracks
+      .filter((track) => track.sid)
+      .map((track) =>
+        svc.mutePublishedTrack(room, identity, track.sid, true)
+      )
+  )
 
   return cors(NextResponse.json({ ok: true }))
 }
+
+
+

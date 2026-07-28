@@ -294,10 +294,22 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
       await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: String(Date.now()) })
       await new Promise((resolve) => window.setTimeout(resolve, 250))
 
-      const currentClaims = [room.localParticipant, ...Array.from(room.remoteParticipants.values())]
-        .map((participant) => ({ participant, claim: auxClaim(participant) }))
-        .filter((entry): entry is { participant: Participant | LocalParticipant; claim: number } => entry.claim !== null)
-        .sort((a, b) => a.claim - b.claim || a.participant.identity.localeCompare(b.participant.identity))
+      const currentClaims = [
+  room.localParticipant,
+  ...Array.from(room.remoteParticipants.values()),
+]
+  .flatMap((participant) => {
+    const claim = auxClaim(participant)
+
+    return claim === null
+      ? []
+      : [{ participant, claim }]
+  })
+  .sort(
+    (a, b) =>
+      a.claim - b.claim ||
+      a.participant.identity.localeCompare(b.participant.identity)
+  )
 
       if (currentClaims[0]?.participant.identity !== room.localParticipant.identity) {
         await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: '' })
