@@ -285,12 +285,27 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
     }
   }
 
+  async function requestAudioPermission() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('This browser does not support audio input.')
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+  })
+
+  stream.getTracks().forEach((track) => track.stop())
+  await refreshDevices()
+}
   async function takeAux() {
+
+    
     if (!isConnected || busy || holder) return
     setBusy(true)
     setDeviceError('')
 
     try {
+        await requestAudioPermission()
       await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: String(Date.now()) })
       await new Promise((resolve) => window.setTimeout(resolve, 250))
 
