@@ -12,6 +12,7 @@ import {
   LocalParticipant,
   Participant,
   RoomEvent,
+  Track,
 } from 'livekit-client'
 import { FormEvent, use, useEffect, useMemo, useState } from 'react'
 
@@ -24,6 +25,8 @@ type AudioDevice = {
   deviceId: string
   label: string
 }
+
+type AudioSourceMode = 'interface' | 'browser'
 
 const AUX_ATTRIBUTE = 'audioArcadeAuxClaim'
 
@@ -193,6 +196,8 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
   const participants = useParticipants()
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [selectedDevice, setSelectedDevice] = useState('')
+  const [audioSource, setAudioSource] = useState<AudioSourceMode>('interface')
+  const [browserAudioTrack, setBrowserAudioTrack] = useState<MediaStreamTrack | null>(null)
   const [busy, setBusy] = useState(false)
   const [statusMessage, setStatusMessage] = useState('Choose an input, then take AUX when it is free.')
   const [deviceError, setDeviceError] = useState('')
@@ -222,7 +227,8 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
   const iHaveAux = holder?.identity === room.localParticipant.identity
   const auxAvailable = !holder
   const isConnected = connectionState === ConnectionState.Connected
-  const isPublishing = room.localParticipant.isMicrophoneEnabled
+  const isPublishing =
+    room.localParticipant.isMicrophoneEnabled || browserAudioTrack?.readyState === 'live'
 
   useEffect(() => {
     const refresh = () => forceParticipantRefresh((value) => value + 1)
@@ -280,8 +286,15 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
   useEffect(() => {
     if (!iHaveAux && isPublishing) {
       void room.localParticipant.setMicrophoneEnabled(false)
+
+      if (browserAudioTrack) {
+        void room.localParticipant
+          .unpublishTrack(browserAudioTrack, true)
+          .catch(() => undefined)
+        setBrowserAudioTrack(null)
+      }
     }
-  }, [iHaveAux, isPublishing, room.localParticipant])
+  }, [browserAudioTrack, iHaveAux, isPublishing, room.localParticipant])
 
   useEffect(() => {
     const releaseBeforeLeaving = () => {
@@ -313,6 +326,56 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
     } catch {
       setDeviceError('Allow microphone access to see your audio inputs.')
     }
+  }
+
+  async function stopBrowserAudio() {
+    if (!browserAudioTrack) return
+
+    await room.localParticipant
+      .unpublishTrack(browserAudioTrack, true)
+      .catch(() => undefined)
+
+    if (browserAudioTrack.readyState !== 'ended') {
+      browserAudioTrack.stop()
+    }
+
+    setBrowserAudioTrack(null)
+  }
+
+  async function requestBrowserAudio() {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      throw new Error('Browser audio sharing is not supported in this browser.')
+    }
+
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true,
+    })
+
+    const audioTrack = stream.getAudioTracks()[0]
+
+    if (!audioTrack) {
+      stream.getTracks().forEach((track) => track.stop())
+      throw new Error(
+        'No audio was shared. Choose a Chrome tab and enable “Share tab audio”.',
+      )
+    }
+
+    stream.getVideoTracks().forEach((track) => track.stop())
+
+    audioTrack.addEventListener(
+      'ended',
+      () => {
+        void room.localParticipant
+          .unpublishTrack(audioTrack, false)
+          .catch(() => undefined)
+        setBrowserAudioTrack((current) => (current === audioTrack ? null : current))
+        setStatusMessage('Browser audio sharing stopped. Pass AUX or choose a new source.')
+      },
+      { once: true },
+    )
+
+    return audioTrack
   }
 
   async function requestAudioPermission() {
@@ -357,7 +420,9 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
     setDeviceError('')
 
     try {
-      await requestAudioPermission()
+      if (audioSource === 'interface') {
+        await requestAudioPermission()
+      }
 
       await room.localParticipant.setAttributes({
         [AUX_ATTRIBUTE]: String(Date.now()),
@@ -384,22 +449,38 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
         return
       }
 
-      if (selectedDevice) {
-        await room.switchActiveDevice('audioinput', selectedDevice)
+      if (audioSource === 'interface') {
+        await stopBrowserAudio()
+
+        if (selectedDevice) {
+          await room.switchActiveDevice('audioinput', selectedDevice)
+        }
+
+        await room.localParticipant.setMicrophoneEnabled(true, {
+          deviceId: selectedDevice || undefined,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+        })
+
+        await refreshDevices()
+        setStatusMessage('You are live from your audio input. Pass AUX when finished.')
+      } else {
+        await room.localParticipant.setMicrophoneEnabled(false)
+        await stopBrowserAudio()
+
+        const audioTrack = await requestBrowserAudio()
+        await room.localParticipant.publishTrack(audioTrack, {
+          name: 'browser-audio',
+          source: Track.Source.ScreenShareAudio,
+        })
+        setBrowserAudioTrack(audioTrack)
+        setStatusMessage('Browser audio is live. Keep the shared tab playing, then pass AUX when finished.')
       }
-
-      await room.localParticipant.setMicrophoneEnabled(true, {
-        deviceId: selectedDevice || undefined,
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-        channelCount: 2,
-      })
-
-      await refreshDevices()
-      setStatusMessage('You are live. Pass AUX when your turn is finished.')
     } catch (error) {
       await room.localParticipant.setMicrophoneEnabled(false).catch(() => undefined)
+      await stopBrowserAudio()
       await room.localParticipant
         .setAttributes({ [AUX_ATTRIBUTE]: '' })
         .catch(() => undefined)
@@ -417,6 +498,7 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
 
     try {
       await room.localParticipant.setMicrophoneEnabled(false)
+      await stopBrowserAudio()
       await room.localParticipant.setAttributes({ [AUX_ATTRIBUTE]: '' })
       setStatusMessage('AUX passed. You are listening again.')
     } catch (error) {
@@ -430,7 +512,7 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
     setSelectedDevice(deviceId)
     setDeviceError('')
 
-    if (!iHaveAux) return
+    if (!iHaveAux || audioSource !== 'interface') return
 
     try {
       await room.switchActiveDevice('audioinput', deviceId)
@@ -473,49 +555,81 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
             <span>{statusMessage}</span>
           </div>
 
-          <label className="aa-device-label" htmlFor="audio-device">
-            Audio input
-          </label>
-          <select
-            id="audio-device"
-            value={selectedDevice}
-            onChange={(event) => void changeDevice(event.target.value)}
-            disabled={busy || devices.length === 0}
-          >
-            {devices.length === 0 ? <option value="">No inputs detected</option> : null}
-            {devices.map((device) => (
-              <option key={device.deviceId} value={device.deviceId}>
-                {device.label}
-              </option>
-            ))}
-          </select>
-          <div className="aa-input-tools">
+          <label className="aa-device-label">Broadcast source</label>
+          <div className="aa-input-tools" role="group" aria-label="Broadcast source">
             <button
-              className="aa-text-button"
+              className={audioSource === 'interface' ? 'aa-primary' : 'aa-text-button'}
               type="button"
-              onClick={() => void requestAudioPermission()}
-              disabled={requestingPermission}
+              onClick={() => setAudioSource('interface')}
+              disabled={busy || iHaveAux}
             >
-              {requestingPermission
-                ? 'Requesting access…'
-                : permissionState === 'granted'
-                  ? 'Audio input enabled'
-                  : 'Enable audio input'}
+              Audio interface
             </button>
-
             <button
-              className="aa-text-button"
+              className={audioSource === 'browser' ? 'aa-primary' : 'aa-text-button'}
               type="button"
-              onClick={() => void refreshDevices()}
+              onClick={() => setAudioSource('browser')}
+              disabled={busy || iHaveAux}
             >
-              Refresh inputs
+              Browser / tab audio
             </button>
           </div>
 
-          <p className="aa-muted">
-            Permission: {permissionState}. The browser may not show another prompt after a
-            previous Allow or Block decision.
-          </p>
+          {audioSource === 'interface' ? (
+            <>
+              <label className="aa-device-label" htmlFor="audio-device">
+                Audio input
+              </label>
+              <select
+                id="audio-device"
+                value={selectedDevice}
+                onChange={(event) => void changeDevice(event.target.value)}
+                disabled={busy || devices.length === 0}
+              >
+                {devices.length === 0 ? <option value="">No inputs detected</option> : null}
+                {devices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label}
+                  </option>
+                ))}
+              </select>
+              <div className="aa-input-tools">
+                <button
+                  className="aa-text-button"
+                  type="button"
+                  onClick={() => void requestAudioPermission()}
+                  disabled={requestingPermission}
+                >
+                  {requestingPermission
+                    ? 'Requesting access…'
+                    : permissionState === 'granted'
+                      ? 'Audio input enabled'
+                      : 'Enable audio input'}
+                </button>
+
+                <button
+                  className="aa-text-button"
+                  type="button"
+                  onClick={() => void refreshDevices()}
+                >
+                  Refresh inputs
+                </button>
+              </div>
+
+              <p className="aa-muted">
+                Permission: {permissionState}. The browser may not show another prompt after a
+                previous Allow or Block decision.
+              </p>
+            </>
+          ) : (
+            <div className="aa-help-box">
+              <strong>Share browser audio</strong>
+              <p>
+                Press Take AUX, choose a Chrome tab, then enable “Share tab audio”. Sharing a
+                tab is more reliable than sharing a window or full screen.
+              </p>
+            </div>
+          )}
 
           {deviceError ? <p className="aa-error">{deviceError}</p> : null}
 
@@ -526,7 +640,13 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
               onClick={() => void takeAux()}
               disabled={!auxAvailable || !isConnected || busy}
             >
-              {busy && !iHaveAux ? 'Taking AUX…' : 'Take AUX'}
+              {busy && !iHaveAux
+                ? audioSource === 'browser'
+                  ? 'Choose a tab…'
+                  : 'Taking AUX…'
+                : audioSource === 'browser'
+                  ? 'Take AUX + choose tab'
+                  : 'Take AUX'}
             </button>
             <button
               className="aa-danger"
@@ -539,7 +659,9 @@ function RoomShell({ roomName, displayName }: { roomName: string; displayName: s
           </div>
 
           <div className="aa-signal-row">
-            <span className={isPublishing ? 'is-on' : ''}>Input {isPublishing ? 'live' : 'muted'}</span>
+            <span className={isPublishing ? 'is-on' : ''}>
+              {audioSource === 'browser' ? 'Browser audio' : 'Input'} {isPublishing ? 'live' : 'muted'}
+            </span>
             <span>Signed in as {displayName}</span>
           </div>
         </section>
