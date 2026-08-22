@@ -707,7 +707,7 @@ function RoomShell({
     statusMessage,
     setStatusMessage,
   ] = useState(
-    'Choose an input, then take AUX when it is free.',
+    'Choose a source, then take AUX when it is free.',
   )
 
   const [
@@ -2170,268 +2170,383 @@ function RoomShell({
              * SOURCE SELECTOR
              */}
 
-            <label className="aa-device-label">
-              Broadcast source
-            </label>
-
-            <div
-              className="aa-input-tools"
-              role="group"
-              aria-label="Broadcast source"
-            >
-              <button
-                className={
-                  audioSource ===
-                  'interface'
-                    ? 'aa-primary'
-                    : 'aa-text-button'
-                }
-                type="button"
-                onClick={() =>
-                  setAudioSource(
-                    'interface',
-                  )
-                }
-                disabled={
-                  busy || iHaveAux
-                }
-              >
-                Audio interface
-              </button>
-
-              <button
-                className={
-                  audioSource ===
-                  'browser'
-                    ? 'aa-primary'
-                    : 'aa-text-button'
-                }
-                type="button"
-                onClick={() =>
-                  setAudioSource(
-                    'browser',
-                  )
-                }
-                disabled={
-                  busy || iHaveAux
-                }
-              >
-                Browser / tab audio
-              </button>
-
-              <button
-                className={
-                  audioSource ===
-                  'file'
-                    ? 'aa-primary'
-                    : 'aa-text-button'
-                }
-                type="button"
-                onClick={() => {
-                  setAudioSource('file')
-                  setDeviceError('')
-                  fileInputRef.current?.click()
-                }}
-                disabled={
-                  busy || iHaveAux
-                }
-              >
-                Audio file
-              </button>
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.flac,.aif,.aiff"
-              style={{ display: 'none' }}
-              disabled={busy || iHaveAux}
-              onChange={(event) => {
-                const file =
-                  event.currentTarget.files?.[0] ??
-                  null
-
-                setSelectedFile(file)
-                setDeviceError('')
-
-                if (file) {
-                  setAudioSource('file')
-                  setStatusMessage(
-                    `${file.name} ready. Take AUX to play.`,
-                  )
-                }
-
-                event.currentTarget.value = ''
-              }}
-            />
-
-            {/*
-             * INTERFACE SOURCE
-             */}
-
-            {audioSource ===
-            'interface' ? (
-              <>
-                <label
-                  className="aa-device-label"
-                  htmlFor="audio-device"
-                >
-                  Audio input
-                </label>
-
-                <select
-                  id="audio-device"
-                  value={
-                    selectedDevice
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    void changeDevice(
-                      event.target
-                        .value,
-                    )
-                  }
-                  disabled={
-                    busy ||
-                    iHaveAux ||
-                    devices.length ===
-                      0
-                  }
-                >
-                  {devices.length ===
-                  0 ? (
-                    <option value="">
-                      No inputs
-                      detected
-                    </option>
-                  ) : null}
-
-                  {devices.map(
-                    (device) => (
-                      <option
-                        key={
-                          device.deviceId
-                        }
-                        value={
-                          device.deviceId
-                        }
-                      >
-                        {
-                          device.label
-                        }
-                      </option>
-                    ),
-                  )}
-                </select>
-
-                <div className="aa-input-tools">
-                  <button
-                    className="aa-text-button"
-                    type="button"
-                    onClick={() =>
-                      void requestAudioPermission()
-                    }
-                    disabled={
-                      requestingPermission
-                    }
-                  >
-                    {requestingPermission
-                      ? 'Requesting access…'
-                      : permissionState ===
-                          'granted'
-                        ? 'Audio input enabled'
-                        : 'Enable audio input'}
-                  </button>
-
-                  <button
-                    className="aa-text-button"
-                    type="button"
-                    onClick={() =>
-                      void refreshDevices()
-                    }
-                  >
-                    Refresh inputs
-                  </button>
+            <div className="aa-source-section">
+              <div className="aa-section-heading">
+                <div>
+                  <p className="aa-kicker">
+                    Broadcast source
+                  </p>
+                  <strong>
+                    Choose how you want to send audio
+                  </strong>
                 </div>
-
-                <p className="aa-muted">
-                  Permission:{' '}
-                  {permissionState}.
-                  The browser may not
-                  show another prompt
-                  after a previous Allow
-                  or Block decision.
-                </p>
-              </>
-            ) : audioSource ===
-              'browser' ? (
-              /*
-               * BROWSER SOURCE
-               */
-
-              <div className="aa-help-box">
-                <strong>
-                  Share browser audio
-                </strong>
-
-                <p>
-                  Press Take AUX,
-                  choose a Chrome tab,
-                  then enable “Share tab
-                  audio”. Sharing a tab
-                  is more reliable than
-                  sharing a window or
-                  full screen.
-                </p>
               </div>
-            ) : (
-              /*
-               * FILE SOURCE
-               */
 
-              <div className="aa-help-box">
-                <strong>
-                  Play an audio file
-                </strong>
-
-                <p>
-                  Choose a track from
-                  your computer. It will
-                  start automatically
-                  when you take AUX.
-                </p>
-
+              <div
+                className="aa-source-grid"
+                role="group"
+                aria-label="Broadcast source"
+              >
                 <button
+                  className={`aa-source-card ${
+                    audioSource ===
+                    'interface'
+                      ? 'is-active'
+                      : ''
+                  }`}
                   type="button"
-                  className="aa-text-button"
                   onClick={() =>
-                    fileInputRef.current?.click()
+                    setAudioSource(
+                      'interface',
+                    )
                   }
                   disabled={
                     busy || iHaveAux
                   }
                 >
-                  {selectedFile
-                    ? 'Choose another file'
-                    : 'Choose audio file'}
+                  <span className="aa-source-tag">
+                    USB
+                  </span>
+
+                  <span className="aa-source-card-title">
+                    USB / Audio Input
+                  </span>
+
+                  <span className="aa-source-card-meta">
+                    Interface, mixer, SP-404 or mic
+                  </span>
                 </button>
 
-                {selectedFile ? (
-                  <p className="aa-muted">
-                    Selected:{' '}
-                    {
-                      selectedFile.name
-                    }
-                  </p>
-                ) : (
-                  <p className="aa-muted">
-                    No audio file
-                    selected.
-                  </p>
-                )}
+                <button
+                  className={`aa-source-card ${
+                    audioSource ===
+                    'browser'
+                      ? 'is-active'
+                      : ''
+                  }`}
+                  type="button"
+                  onClick={() =>
+                    setAudioSource(
+                      'browser',
+                    )
+                  }
+                  disabled={
+                    busy || iHaveAux
+                  }
+                >
+                  <span className="aa-source-tag">
+                    Desktop
+                  </span>
+
+                  <span className="aa-source-card-title">
+                    Browser / Screen
+                  </span>
+
+                  <span className="aa-source-card-meta">
+                    Share tab or computer audio
+                  </span>
+                </button>
+
+                <button
+                  className={`aa-source-card ${
+                    audioSource ===
+                    'file'
+                      ? 'is-active'
+                      : ''
+                  }`}
+                  type="button"
+                  onClick={() => {
+                    setAudioSource(
+                      'file',
+                    )
+                    setDeviceError('')
+                    fileInputRef.current?.click()
+                  }}
+                  disabled={
+                    busy || iHaveAux
+                  }
+                >
+                  <span className="aa-source-tag">
+                    File
+                  </span>
+
+                  <span className="aa-source-card-title">
+                    Audio File
+                  </span>
+
+                  <span className="aa-source-card-meta">
+                    MP3, WAV and other audio
+                  </span>
+                </button>
               </div>
-            )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.flac,.aif,.aiff"
+                style={{
+                  display: 'none',
+                }}
+                disabled={
+                  busy || iHaveAux
+                }
+                onChange={(event) => {
+                  const file =
+                    event.currentTarget.files?.[0] ??
+                    null
+
+                  setSelectedFile(file)
+                  setDeviceError('')
+
+                  if (file) {
+                    setAudioSource(
+                      'file',
+                    )
+
+                    setStatusMessage(
+                      `${file.name} ready. Take AUX to play.`,
+                    )
+                  }
+
+                  event.currentTarget.value =
+                    ''
+                }}
+              />
+
+              {audioSource ===
+              'interface' ? (
+                <div className="aa-source-panel">
+                  <div className="aa-source-panel-copy">
+                    <strong>
+                      USB / Audio Input
+                    </strong>
+
+                    <p>
+                      Connect your audio interface, mixer,
+                      SP-404 or other USB-C audio device.
+                      Enable audio access, refresh the
+                      inputs, then choose the device below.
+                    </p>
+                  </div>
+
+                  <label
+                    className="aa-device-label"
+                    htmlFor="audio-device"
+                  >
+                    Audio input
+                  </label>
+
+                  <select
+                    id="audio-device"
+                    value={
+                      selectedDevice
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      void changeDevice(
+                        event.target
+                          .value,
+                      )
+                    }
+                    disabled={
+                      busy ||
+                      iHaveAux ||
+                      devices.length ===
+                        0
+                    }
+                  >
+                    {devices.length ===
+                    0 ? (
+                      <option value="">
+                        No inputs detected
+                      </option>
+                    ) : null}
+
+                    {devices.map(
+                      (device) => (
+                        <option
+                          key={
+                            device.deviceId
+                          }
+                          value={
+                            device.deviceId
+                          }
+                        >
+                          {
+                            device.label
+                          }
+                        </option>
+                      ),
+                    )}
+                  </select>
+
+                  <div className="aa-source-actions">
+                    <button
+                      className="aa-text-button"
+                      type="button"
+                      onClick={() =>
+                        void requestAudioPermission()
+                      }
+                      disabled={
+                        requestingPermission
+                      }
+                    >
+                      {requestingPermission
+                        ? 'Requesting access…'
+                        : permissionState ===
+                            'granted'
+                          ? 'Audio input enabled'
+                          : 'Enable audio input'}
+                    </button>
+
+                    <button
+                      className="aa-text-button"
+                      type="button"
+                      onClick={() =>
+                        void refreshDevices()
+                      }
+                    >
+                      Detect / refresh inputs
+                    </button>
+                  </div>
+
+                  <p className="aa-source-tip">
+                    Mobile tip: connect the USB-C audio
+                    device before pressing Detect /
+                    refresh inputs.
+                  </p>
+                </div>
+              ) : audioSource ===
+                'browser' ? (
+                <div className="aa-source-panel">
+                  <div className="aa-source-panel-copy">
+                    <div className="aa-source-panel-title-row">
+                      <strong>
+                        Share computer audio
+                      </strong>
+
+                      <span className="aa-desktop-badge">
+                        Chrome desktop
+                      </span>
+                    </div>
+
+                    <p>
+                      Use this when your music is playing
+                      in a browser, DAW, media player or
+                      another desktop app.
+                    </p>
+                  </div>
+
+                  <div className="aa-browser-tutorial">
+                    <strong>
+                      How to share audio
+                    </strong>
+
+                    <ol>
+                      <li>
+                        Press{' '}
+                        <b>
+                          Take AUX + share audio
+                        </b>.
+                      </li>
+
+                      <li>
+                        In Chrome&apos;s share window,
+                        select{' '}
+                        <b>
+                          Entire Screen
+                        </b>{' '}
+                        for whole-computer audio.
+                      </li>
+
+                      <li>
+                        Turn on the{' '}
+                        <b>
+                          Share system audio
+                        </b>{' '}
+                        or{' '}
+                        <b>
+                          Share audio
+                        </b>{' '}
+                        switch at the bottom before
+                        continuing.
+                      </li>
+
+                      <li>
+                        Press{' '}
+                        <b>
+                          Share
+                        </b>{' '}
+                        and return to Audio Arcade.
+                      </li>
+                    </ol>
+
+                    <p>
+                      Sharing only one Chrome tab? Choose{' '}
+                      <b>
+                        Chrome Tab
+                      </b>{' '}
+                      instead and make sure{' '}
+                      <b>
+                        Share tab audio
+                      </b>{' '}
+                      is switched on.
+                    </p>
+                  </div>
+
+                  <p className="aa-source-warning">
+                    Browser / screen audio sharing is
+                    primarily a desktop feature. On mobile,
+                    use USB / Audio Input or Audio File.
+                  </p>
+                </div>
+              ) : (
+                <div className="aa-source-panel">
+                  <div className="aa-source-panel-copy">
+                    <strong>
+                      Play an audio file
+                    </strong>
+
+                    <p>
+                      Choose a track stored on your device.
+                      It starts automatically when you take
+                      AUX and runs through the live mixer.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="aa-file-button"
+                    onClick={() =>
+                      fileInputRef.current?.click()
+                    }
+                    disabled={
+                      busy || iHaveAux
+                    }
+                  >
+                    {selectedFile
+                      ? 'Choose another file'
+                      : 'Choose audio file'}
+                  </button>
+
+                  {selectedFile ? (
+                    <p className="aa-selected-file">
+                      <span>
+                        Selected
+                      </span>
+                      {
+                        selectedFile.name
+                      }
+                    </p>
+                  ) : (
+                    <p className="aa-source-tip">
+                      No audio file selected.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="aa-fx-panel">
               <div className="aa-fx-heading">
@@ -2439,6 +2554,7 @@ function RoomShell({
                   <p className="aa-kicker">
                     Live mixer
                   </p>
+
                   <strong>
                     Player controls
                   </strong>
@@ -2506,8 +2622,9 @@ function RoomShell({
               </div>
 
               <p className="aa-muted aa-fx-note">
-                Set these before taking AUX or adjust them live while you are playing.
-                Echo adds a short delay tail; Glitch creates digital chops/dropouts.
+                Drag knobs left or right. Set them before
+                taking AUX or adjust them live while you
+                play.
               </p>
             </div>
 
@@ -2547,7 +2664,7 @@ function RoomShell({
                       : 'Taking AUX…'
                   : audioSource ===
                       'browser'
-                    ? 'Take AUX + choose tab'
+                    ? 'Take AUX + share audio'
                     : audioSource ===
                         'file'
                       ? 'Take AUX + play file'

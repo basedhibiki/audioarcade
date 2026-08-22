@@ -374,3 +374,283 @@ button:disabled { cursor: not-allowed; opacity: .45; }
     width: 4.2rem;
   }
 }
+
+/* Audio Arcade source selector + compact setup guides */
+.aa-source-section {
+  margin-top: 1.5rem;
+}
+
+.aa-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .85rem;
+}
+
+.aa-section-heading strong {
+  color: #f7f2df;
+  font-size: .95rem;
+}
+
+.aa-source-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .65rem;
+}
+
+.aa-source-card {
+  min-width: 0;
+  min-height: 6.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: .3rem;
+  padding: .85rem;
+  border: 1px solid #3c3234;
+  border-radius: .85rem;
+  background:
+    linear-gradient(150deg, rgba(35, 29, 31, .96), rgba(13, 10, 11, .98));
+  color: #f7f2df;
+  text-align: left;
+  transition:
+    border-color .15s ease,
+    transform .15s ease,
+    background .15s ease;
+}
+
+.aa-source-card:not(:disabled):hover {
+  border-color: #66595c;
+  transform: translateY(-1px);
+}
+
+.aa-source-card.is-active {
+  border-color: rgba(242, 211, 53, .72);
+  background:
+    linear-gradient(150deg, rgba(67, 55, 17, .72), rgba(17, 13, 10, .98));
+  box-shadow:
+    inset 0 0 0 1px rgba(242, 211, 53, .08);
+}
+
+.aa-source-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: .12rem .4rem;
+  margin-bottom: .2rem;
+  border-radius: .28rem;
+  background: #2c2527;
+  color: #a89da0;
+  font-size: .56rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.aa-source-card.is-active .aa-source-tag {
+  background: var(--aa-yellow);
+  color: #181010;
+}
+
+.aa-source-card-title {
+  color: #fff;
+  font-size: .83rem;
+  font-weight: 900;
+}
+
+.aa-source-card-meta {
+  color: #93878a;
+  font-size: .65rem;
+  line-height: 1.35;
+}
+
+.aa-source-panel {
+  margin-top: .75rem;
+  padding: 1rem;
+  border: 1px solid #30282a;
+  border-radius: .85rem;
+  background: #0d090a;
+}
+
+.aa-source-panel-copy {
+  margin-bottom: .85rem;
+}
+
+.aa-source-panel-copy strong {
+  color: #f4edef;
+  font-size: .86rem;
+}
+
+.aa-source-panel-copy p {
+  max-width: 52rem;
+  margin: .35rem 0 0;
+  color: #9f9497;
+  font-size: .75rem;
+  line-height: 1.55;
+}
+
+.aa-source-panel-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .55rem;
+}
+
+.aa-desktop-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.4rem;
+  padding: .12rem .45rem;
+  border-radius: 999px;
+  background: rgba(106, 92, 247, .14);
+  border: 1px solid rgba(106, 92, 247, .32);
+  color: #bdb5ff;
+  font-size: .57rem;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.aa-source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: .35rem;
+}
+
+.aa-source-tip,
+.aa-source-warning {
+  margin: .75rem 0 0;
+  color: #897d80;
+  font-size: .68rem;
+  line-height: 1.5;
+}
+
+.aa-source-warning {
+  padding-left: .65rem;
+  border-left: 2px solid #6a5cf7;
+  color: #a69ca0;
+}
+
+.aa-browser-tutorial {
+  padding: .8rem .9rem;
+  border-radius: .7rem;
+  background: #151012;
+  border: 1px solid #33292c;
+  color: #afa4a7;
+  font-size: .72rem;
+  line-height: 1.5;
+}
+
+.aa-browser-tutorial > strong {
+  color: var(--aa-yellow);
+}
+
+.aa-browser-tutorial ol {
+  margin: .6rem 0 .55rem;
+  padding-left: 1.15rem;
+}
+
+.aa-browser-tutorial li + li {
+  margin-top: .35rem;
+}
+
+.aa-browser-tutorial b {
+  color: #f2e9eb;
+}
+
+.aa-browser-tutorial p {
+  margin: .5rem 0 0;
+}
+
+.aa-file-button {
+  min-height: 2.8rem;
+  padding: .72rem 1rem;
+  border: 1px solid rgba(242, 211, 53, .45);
+  border-radius: .7rem;
+  background: rgba(242, 211, 53, .1);
+  color: var(--aa-yellow);
+  font-weight: 850;
+}
+
+.aa-file-button:not(:disabled):hover {
+  background: rgba(242, 211, 53, .16);
+}
+
+.aa-selected-file {
+  display: grid;
+  gap: .2rem;
+  margin: .7rem 0 0;
+  color: #f3edef;
+  font-size: .75rem;
+  overflow-wrap: anywhere;
+}
+
+.aa-selected-file span {
+  color: #7f7477;
+  font-size: .58rem;
+  font-weight: 850;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+/* Mixer shell; knob-specific visuals remain below in globals.css */
+.aa-fx-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(242, 211, 53, .2);
+  border-radius: .9rem;
+  background:
+    linear-gradient(145deg, rgba(242, 211, 53, .055), rgba(106, 92, 247, .055));
+}
+
+.aa-fx-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .85rem;
+}
+
+.aa-fx-heading strong {
+  color: #f7f2df;
+  font-size: .92rem;
+}
+
+.aa-fx-reset {
+  flex: 0 0 auto;
+}
+
+.aa-fx-note {
+  margin: .8rem 0 0;
+  font-size: .68rem;
+}
+
+@media (max-width: 720px) {
+  .aa-source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .aa-source-card {
+    min-height: 4.8rem;
+  }
+
+  .aa-source-actions {
+    gap: .25rem 1rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .aa-source-panel,
+  .aa-fx-panel {
+    padding: .85rem;
+  }
+
+  .aa-section-heading,
+  .aa-fx-heading {
+    align-items: flex-start;
+  }
+}
+
