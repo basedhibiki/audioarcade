@@ -18,6 +18,7 @@ import {
 
 import {
   FormEvent,
+  type CSSProperties,
   use,
   useEffect,
   useMemo,
@@ -64,6 +65,240 @@ function auxClaim(
   return Number.isFinite(timestamp)
     ? timestamp
     : null
+}
+
+function dbToGain(db: number) {
+  return Math.pow(10, db / 20)
+}
+
+function FxSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  displayValue,
+  onChange,
+  disabled = false,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  displayValue: string
+  onChange: (value: number) => void
+  disabled?: boolean
+}) {
+  const dragStartXRef =
+    useRef<number | null>(null)
+
+  const dragStartValueRef =
+    useRef(value)
+
+  const [dragging, setDragging] =
+    useState(false)
+
+  const range =
+    Math.max(0.0001, max - min)
+
+  const normalised =
+    Math.min(
+      1,
+      Math.max(
+        0,
+        (value - min) / range,
+      ),
+    )
+
+  const angle =
+    -135 + normalised * 270
+
+  function clampAndStep(
+    nextValue: number,
+  ) {
+    const clamped =
+      Math.min(
+        max,
+        Math.max(min, nextValue),
+      )
+
+    const stepped =
+      min +
+      Math.round(
+        (clamped - min) / step,
+      ) *
+        step
+
+    return Number(
+      Math.min(
+        max,
+        Math.max(min, stepped),
+      ).toFixed(4),
+    )
+  }
+
+  function nudge(
+    direction: number,
+  ) {
+    if (disabled) return
+
+    onChange(
+      clampAndStep(
+        value +
+          step * direction,
+      ),
+    )
+  }
+
+  return (
+    <div
+      className={`aa-fx-control ${
+        dragging ? 'is-dragging' : ''
+      }`}
+    >
+      <div className="aa-fx-label">
+        <strong>{label}</strong>
+        <output>{displayValue}</output>
+      </div>
+
+      <div className="aa-knob-row">
+        <div
+          className="aa-knob-drag-zone"
+          role="slider"
+          tabIndex={disabled ? -1 : 0}
+          aria-label={label}
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={value}
+          aria-valuetext={displayValue}
+          aria-disabled={disabled}
+          title="Drag left/right to adjust"
+          onPointerDown={(event) => {
+            if (disabled) return
+
+            dragStartXRef.current =
+              event.clientX
+
+            dragStartValueRef.current =
+              value
+
+            setDragging(true)
+
+            event.currentTarget.setPointerCapture(
+              event.pointerId,
+            )
+          }}
+          onPointerMove={(event) => {
+            if (
+              disabled ||
+              dragStartXRef.current ===
+                null
+            ) {
+              return
+            }
+
+            /*
+             * About 170 CSS pixels of
+             * horizontal movement spans
+             * the full knob range.
+             */
+            const deltaX =
+              event.clientX -
+              dragStartXRef.current
+
+            const nextValue =
+              dragStartValueRef.current +
+              (deltaX / 170) * range
+
+            onChange(
+              clampAndStep(
+                nextValue,
+              ),
+            )
+          }}
+          onPointerUp={(event) => {
+            dragStartXRef.current =
+              null
+
+            setDragging(false)
+
+            if (
+              event.currentTarget.hasPointerCapture(
+                event.pointerId,
+              )
+            ) {
+              event.currentTarget.releasePointerCapture(
+                event.pointerId,
+              )
+            }
+          }}
+          onPointerCancel={() => {
+            dragStartXRef.current =
+              null
+
+            setDragging(false)
+          }}
+          onKeyDown={(event) => {
+            if (disabled) return
+
+            if (
+              event.key ===
+                'ArrowRight' ||
+              event.key ===
+                'ArrowUp'
+            ) {
+              event.preventDefault()
+              nudge(1)
+            }
+
+            if (
+              event.key ===
+                'ArrowLeft' ||
+              event.key ===
+                'ArrowDown'
+            ) {
+              event.preventDefault()
+              nudge(-1)
+            }
+
+            if (
+              event.key === 'Home'
+            ) {
+              event.preventDefault()
+              onChange(min)
+            }
+
+            if (
+              event.key === 'End'
+            ) {
+              event.preventDefault()
+              onChange(max)
+            }
+          }}
+        >
+          <div
+            className="aa-knob"
+            aria-hidden="true"
+            style={{
+              '--aa-knob-angle':
+                `${angle}deg`,
+              '--aa-knob-fill':
+                `${normalised * 100}%`,
+            } as CSSProperties}
+          >
+            <span className="aa-knob-cap">
+              <span className="aa-knob-marker" />
+            </span>
+          </div>
+
+          <span className="aa-knob-drag-hint">
+            ← drag →
+          </span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function ChannelPage({
@@ -384,8 +619,8 @@ function RoomShell({
     )
 
   const [
-    browserAudioTrack,
-    setBrowserAudioTrack,
+    publishedAudioTrack,
+    setPublishedAudioTrack,
   ] =
     useState<MediaStreamTrack | null>(
       null,
@@ -410,21 +645,56 @@ function RoomShell({
       null,
     )
 
-  const fileAudioTrackRef =
-    useRef<MediaStreamTrack | null>(
-      null,
-    )
-
-  const fileAudioContextRef =
-    useRef<AudioContext | null>(
-      null,
-    )
-
   const fileAudioUrlRef =
     useRef<string | null>(null)
 
   const fileInputRef =
     useRef<HTMLInputElement | null>(null)
+
+  /*
+   * LIVE AUDIO FX
+   *
+   * Gain is pre-FX input gain.
+   * Volume is the final output level.
+   * Echo is a wet delay + feedback send.
+   * Glitch is a controllable digital gate/chop.
+   */
+
+  const [volume, setVolume] =
+    useState(100)
+
+  const [gainDb, setGainDb] =
+    useState(0)
+
+  const [echoAmount, setEchoAmount] =
+    useState(0)
+
+  const [glitchAmount, setGlitchAmount] =
+    useState(0)
+
+  const audioContextRef =
+    useRef<AudioContext | null>(null)
+
+  const sourceMediaTrackRef =
+    useRef<MediaStreamTrack | null>(null)
+
+  const inputGainNodeRef =
+    useRef<GainNode | null>(null)
+
+  const glitchGainNodeRef =
+    useRef<GainNode | null>(null)
+
+  const echoWetNodeRef =
+    useRef<GainNode | null>(null)
+
+  const echoFeedbackNodeRef =
+    useRef<GainNode | null>(null)
+
+  const masterGainNodeRef =
+    useRef<GainNode | null>(null)
+
+  const glitchTimerRef =
+    useRef<number | null>(null)
 
   /*
    * GENERAL STATE
@@ -541,9 +811,7 @@ function RoomShell({
     ConnectionState.Connected
 
   const isPublishing =
-    room.localParticipant
-      .isMicrophoneEnabled ||
-    browserAudioTrack?.readyState ===
+    publishedAudioTrack?.readyState ===
       'live' ||
     fileIsPlaying
 
@@ -693,30 +961,11 @@ function RoomShell({
       !iHaveAux &&
       isPublishing
     ) {
-      void room.localParticipant.setMicrophoneEnabled(
-        false,
-      )
-
-      if (browserAudioTrack) {
-        void room.localParticipant
-          .unpublishTrack(
-            browserAudioTrack,
-            true,
-          )
-          .catch(
-            () => undefined,
-          )
-
-        setBrowserAudioTrack(null)
-      }
-
-      void stopFileAudio()
+      void stopProcessedAudio()
     }
   }, [
-    browserAudioTrack,
     iHaveAux,
     isPublishing,
-    room.localParticipant,
   ])
 
   /*
@@ -808,32 +1057,556 @@ function RoomShell({
   }
 
   /*
-   * BROWSER / TAB AUDIO
+   * LIVE AUDIO PROCESSOR
    */
 
-  async function stopBrowserAudio() {
-    if (!browserAudioTrack) {
+  function stopGlitchTimer() {
+    if (
+      glitchTimerRef.current !==
+      null
+    ) {
+      window.clearInterval(
+        glitchTimerRef.current,
+      )
+
+      glitchTimerRef.current =
+        null
+    }
+
+    const context =
+      audioContextRef.current
+
+    const glitchNode =
+      glitchGainNodeRef.current
+
+    if (
+      context &&
+      glitchNode
+    ) {
+      const now =
+        context.currentTime
+
+      glitchNode.gain.cancelScheduledValues(
+        now,
+      )
+
+      glitchNode.gain.setTargetAtTime(
+        1,
+        now,
+        0.01,
+      )
+    }
+  }
+
+  function startGlitchTimer() {
+    stopGlitchTimer()
+
+    const context =
+      audioContextRef.current
+
+    const glitchNode =
+      glitchGainNodeRef.current
+
+    if (
+      !context ||
+      !glitchNode ||
+      glitchAmount <= 0 ||
+      !publishedAudioTrack
+    ) {
       return
     }
 
-    await room.localParticipant
-      .unpublishTrack(
-        browserAudioTrack,
-        true,
+    const intensity =
+      glitchAmount / 100
+
+    const intervalMs =
+      Math.max(
+        55,
+        280 -
+          glitchAmount * 2.15,
       )
-      .catch(() => undefined)
 
-    if (
-      browserAudioTrack.readyState !==
-      'ended'
-    ) {
-      browserAudioTrack.stop()
-    }
+    glitchTimerRef.current =
+      window.setInterval(() => {
+        const activeContext =
+          audioContextRef.current
 
-    setBrowserAudioTrack(null)
+        const activeNode =
+          glitchGainNodeRef.current
+
+        if (
+          !activeContext ||
+          !activeNode
+        ) {
+          return
+        }
+
+        const chance =
+          0.12 +
+          intensity * 0.7
+
+        if (
+          Math.random() >
+          chance
+        ) {
+          return
+        }
+
+        const now =
+          activeContext.currentTime
+
+        const cutLength =
+          0.018 +
+          Math.random() *
+            (0.025 +
+              intensity * 0.09)
+
+        const cutLevel =
+          Math.max(
+            0,
+            0.45 -
+              intensity * 0.55,
+          )
+
+        activeNode.gain.cancelScheduledValues(
+          now,
+        )
+
+        activeNode.gain.setValueAtTime(
+          1,
+          now,
+        )
+
+        activeNode.gain.linearRampToValueAtTime(
+          cutLevel,
+          now + 0.003,
+        )
+
+        activeNode.gain.setValueAtTime(
+          cutLevel,
+          now +
+            Math.max(
+              0.006,
+              cutLength - 0.004,
+            ),
+        )
+
+        activeNode.gain.linearRampToValueAtTime(
+          1,
+          now + cutLength,
+        )
+      }, intervalMs)
   }
 
-  async function requestBrowserAudio() {
+  function applyFxSettings() {
+    const context =
+      audioContextRef.current
+
+    if (!context) return
+
+    const now =
+      context.currentTime
+
+    inputGainNodeRef.current?.gain.setTargetAtTime(
+      dbToGain(gainDb),
+      now,
+      0.015,
+    )
+
+    masterGainNodeRef.current?.gain.setTargetAtTime(
+      volume / 100,
+      now,
+      0.015,
+    )
+
+    const echo =
+      echoAmount / 100
+
+    echoWetNodeRef.current?.gain.setTargetAtTime(
+      echo * 0.85,
+      now,
+      0.02,
+    )
+
+    echoFeedbackNodeRef.current?.gain.setTargetAtTime(
+      Math.min(
+        0.72,
+        echo * 0.68,
+      ),
+      now,
+      0.02,
+    )
+  }
+
+  useEffect(() => {
+    applyFxSettings()
+  }, [
+    volume,
+    gainDb,
+    echoAmount,
+  ])
+
+  useEffect(() => {
+    startGlitchTimer()
+
+    return () => {
+      stopGlitchTimer()
+    }
+  }, [
+    glitchAmount,
+    publishedAudioTrack,
+  ])
+
+  async function buildProcessedTrack(
+    context: AudioContext,
+    source: AudioNode,
+    monitorLocally = false,
+  ) {
+    const inputGain =
+      context.createGain()
+
+    const glitchGain =
+      context.createGain()
+
+    const dryGain =
+      context.createGain()
+
+    const delay =
+      context.createDelay(1.5)
+
+    const echoFeedback =
+      context.createGain()
+
+    const echoWet =
+      context.createGain()
+
+    const masterGain =
+      context.createGain()
+
+    const destination =
+      context.createMediaStreamDestination()
+
+    /*
+     * Fixed echo timing. The Echo
+     * slider controls wet amount and
+     * feedback rather than delay time.
+     */
+
+    delay.delayTime.value =
+      0.285
+
+    dryGain.gain.value = 1
+    glitchGain.gain.value = 1
+
+    inputGain.gain.value =
+      dbToGain(gainDb)
+
+    masterGain.gain.value =
+      volume / 100
+
+    const echo =
+      echoAmount / 100
+
+    echoWet.gain.value =
+      echo * 0.85
+
+    echoFeedback.gain.value =
+      Math.min(
+        0.72,
+        echo * 0.68,
+      )
+
+    source.connect(inputGain)
+    inputGain.connect(glitchGain)
+
+    /*
+     * Dry signal.
+     */
+
+    glitchGain.connect(dryGain)
+    dryGain.connect(masterGain)
+
+    /*
+     * Echo signal.
+     */
+
+    glitchGain.connect(delay)
+    delay.connect(echoWet)
+    echoWet.connect(masterGain)
+
+    delay.connect(echoFeedback)
+    echoFeedback.connect(delay)
+
+    /*
+     * LiveKit output.
+     */
+
+    masterGain.connect(destination)
+
+    /*
+     * Only audio-file playback is
+     * monitored locally. Mic/interface
+     * and shared-tab audio are not,
+     * avoiding feedback.
+     */
+
+    if (monitorLocally) {
+      masterGain.connect(
+        context.destination,
+      )
+    }
+
+    inputGainNodeRef.current =
+      inputGain
+
+    glitchGainNodeRef.current =
+      glitchGain
+
+    echoWetNodeRef.current =
+      echoWet
+
+    echoFeedbackNodeRef.current =
+      echoFeedback
+
+    masterGainNodeRef.current =
+      masterGain
+
+    await context.resume()
+
+    const processedTrack =
+      destination.stream
+        .getAudioTracks()[0]
+
+    if (!processedTrack) {
+      throw new Error(
+        'Could not create the processed audio track.',
+      )
+    }
+
+    return processedTrack
+  }
+
+  async function stopProcessedAudio() {
+    const publishedTrack =
+      publishedAudioTrack
+
+    const sourceTrack =
+      sourceMediaTrackRef.current
+
+    const audio =
+      fileAudioRef.current
+
+    const context =
+      audioContextRef.current
+
+    const objectUrl =
+      fileAudioUrlRef.current
+
+    /*
+     * Clear references first so
+     * repeated cleanup is safe.
+     */
+
+    sourceMediaTrackRef.current =
+      null
+
+    fileAudioRef.current =
+      null
+
+    fileAudioUrlRef.current =
+      null
+
+    audioContextRef.current =
+      null
+
+    inputGainNodeRef.current =
+      null
+
+    glitchGainNodeRef.current =
+      null
+
+    echoWetNodeRef.current =
+      null
+
+    echoFeedbackNodeRef.current =
+      null
+
+    masterGainNodeRef.current =
+      null
+
+    stopGlitchTimer()
+
+    setPublishedAudioTrack(null)
+    setFileIsPlaying(false)
+
+    /*
+     * Also disable any old raw
+     * LiveKit microphone publication
+     * from earlier builds.
+     */
+
+    await room.localParticipant
+      .setMicrophoneEnabled(false)
+      .catch(() => undefined)
+
+    if (publishedTrack) {
+      await room.localParticipant
+        .unpublishTrack(
+          publishedTrack,
+          true,
+        )
+        .catch(
+          () => undefined,
+        )
+
+      if (
+        publishedTrack.readyState !==
+        'ended'
+      ) {
+        publishedTrack.stop()
+      }
+    }
+
+    if (
+      sourceTrack &&
+      sourceTrack.readyState !==
+        'ended'
+    ) {
+      sourceTrack.stop()
+    }
+
+    if (audio) {
+      audio.pause()
+
+      try {
+        audio.currentTime = 0
+      } catch {
+        // Safe to ignore.
+      }
+
+      audio.removeAttribute('src')
+
+      try {
+        audio.load()
+      } catch {
+        // Safe to ignore.
+      }
+    }
+
+    if (
+      context &&
+      context.state !==
+        'closed'
+    ) {
+      await context
+        .close()
+        .catch(
+          () => undefined,
+        )
+    }
+
+    if (objectUrl) {
+      URL.revokeObjectURL(
+        objectUrl,
+      )
+    }
+  }
+
+  /*
+   * AUDIO INTERFACE SOURCE
+   */
+
+  async function startInterfaceAudio() {
+    if (
+      !navigator.mediaDevices
+        ?.getUserMedia
+    ) {
+      throw new Error(
+        'This browser does not support audio input.',
+      )
+    }
+
+    await stopProcessedAudio()
+
+    const stream =
+      await navigator.mediaDevices.getUserMedia(
+        {
+          audio: {
+            deviceId:
+              selectedDevice ||
+              undefined,
+            echoCancellation:
+              false,
+            noiseSuppression:
+              false,
+            autoGainControl:
+              false,
+            channelCount: 2,
+          },
+        },
+      )
+
+    const sourceTrack =
+      stream.getAudioTracks()[0]
+
+    if (!sourceTrack) {
+      stream
+        .getTracks()
+        .forEach((track) =>
+          track.stop(),
+        )
+
+      throw new Error(
+        'No audio input track was created.',
+      )
+    }
+
+    sourceMediaTrackRef.current =
+      sourceTrack
+
+    const context =
+      new AudioContext()
+
+    audioContextRef.current =
+      context
+
+    const source =
+      context.createMediaStreamSource(
+        stream,
+      )
+
+    const processedTrack =
+      await buildProcessedTrack(
+        context,
+        source,
+        false,
+      )
+
+    await room.localParticipant.publishTrack(
+      processedTrack,
+      {
+        name: 'interface-audio',
+        source:
+          Track.Source.Microphone,
+      },
+    )
+
+    setPublishedAudioTrack(
+      processedTrack,
+    )
+
+    setPermissionState(
+      'granted',
+    )
+
+    await refreshDevices()
+  }
+
+  /*
+   * BROWSER / TAB AUDIO SOURCE
+   */
+
+  async function startBrowserAudio() {
     if (
       !navigator.mediaDevices
         ?.getDisplayMedia
@@ -843,6 +1616,8 @@ function RoomShell({
       )
     }
 
+    await stopProcessedAudio()
+
     const stream =
       await navigator.mediaDevices.getDisplayMedia(
         {
@@ -851,10 +1626,10 @@ function RoomShell({
         },
       )
 
-    const audioTrack =
+    const sourceTrack =
       stream.getAudioTracks()[0]
 
-    if (!audioTrack) {
+    if (!sourceTrack) {
       stream
         .getTracks()
         .forEach((track) =>
@@ -866,160 +1641,66 @@ function RoomShell({
       )
     }
 
-    /*
-     * We only need the audio.
-     */
     stream
       .getVideoTracks()
       .forEach((track) =>
         track.stop(),
       )
 
-    audioTrack.addEventListener(
+    sourceMediaTrackRef.current =
+      sourceTrack
+
+    sourceTrack.addEventListener(
       'ended',
       () => {
-        void room.localParticipant
-          .unpublishTrack(
-            audioTrack,
-            false,
-          )
-          .catch(
-            () => undefined,
-          )
-
-        setBrowserAudioTrack(
-          (current) =>
-            current ===
-            audioTrack
-              ? null
-              : current,
-        )
-
         setStatusMessage(
           'Browser audio sharing stopped. Pass AUX or choose a new source.',
         )
-      },
 
+        void stopProcessedAudio()
+      },
       {
         once: true,
       },
     )
 
-    return audioTrack
+    const context =
+      new AudioContext()
+
+    audioContextRef.current =
+      context
+
+    const source =
+      context.createMediaStreamSource(
+        new MediaStream([
+          sourceTrack,
+        ]),
+      )
+
+    const processedTrack =
+      await buildProcessedTrack(
+        context,
+        source,
+        false,
+      )
+
+    await room.localParticipant.publishTrack(
+      processedTrack,
+      {
+        name: 'browser-audio',
+        source:
+          Track.Source.ScreenShareAudio,
+      },
+    )
+
+    setPublishedAudioTrack(
+      processedTrack,
+    )
   }
 
   /*
-   * FILE AUDIO
+   * AUDIO FILE SOURCE
    */
-
-  async function stopFileAudio() {
-    /*
-     * Pull references first so
-     * cleanup still works even if
-     * React state changes while this
-     * function is running.
-     */
-
-    const track =
-      fileAudioTrackRef.current
-
-    const audio =
-      fileAudioRef.current
-
-    const audioContext =
-      fileAudioContextRef.current
-
-    const objectUrl =
-      fileAudioUrlRef.current
-
-    /*
-     * Clear refs immediately.
-     */
-
-    fileAudioTrackRef.current =
-      null
-
-    fileAudioRef.current = null
-
-    fileAudioContextRef.current =
-      null
-
-    fileAudioUrlRef.current = null
-
-    setFileIsPlaying(false)
-
-    /*
-     * Remove track from LiveKit.
-     */
-
-    if (track) {
-      await room.localParticipant
-        .unpublishTrack(
-          track,
-          true,
-        )
-        .catch(
-          () => undefined,
-        )
-
-      if (
-        track.readyState !==
-        'ended'
-      ) {
-        track.stop()
-      }
-    }
-
-    /*
-     * Stop local playback.
-     */
-
-    if (audio) {
-      audio.pause()
-
-      try {
-        audio.currentTime = 0
-      } catch {
-        // Some formats may not allow
-        // seeking during cleanup.
-      }
-
-      audio.removeAttribute('src')
-
-      try {
-        audio.load()
-      } catch {
-        // Safe to ignore during
-        // cleanup.
-      }
-    }
-
-    /*
-     * Close Web Audio.
-     */
-
-    if (
-      audioContext &&
-      audioContext.state !==
-        'closed'
-    ) {
-      await audioContext
-        .close()
-        .catch(
-          () => undefined,
-        )
-    }
-
-    /*
-     * Release temporary file URL.
-     */
-
-    if (objectUrl) {
-      URL.revokeObjectURL(
-        objectUrl,
-      )
-    }
-  }
 
   async function startFileAudio() {
     if (!selectedFile) {
@@ -1028,12 +1709,7 @@ function RoomShell({
       )
     }
 
-    /*
-     * Make sure an old file session
-     * is gone.
-     */
-
-    await stopFileAudio()
+    await stopProcessedAudio()
 
     const objectUrl =
       URL.createObjectURL(
@@ -1045,100 +1721,45 @@ function RoomShell({
 
     audio.preload = 'auto'
 
-    const audioContext =
-      new AudioContext()
-
-    const source =
-      audioContext.createMediaElementSource(
-        audio,
-      )
-
-    const destination =
-      audioContext.createMediaStreamDestination()
-
-    /*
-     * One path goes to LiveKit.
-     *
-     * The second path goes to local
-     * headphones so the performer can
-     * hear their own file.
-     */
-
-    source.connect(destination)
-
-    source.connect(
-      audioContext.destination,
-    )
-
-    const track =
-      destination.stream.getAudioTracks()[0]
-
-    if (!track) {
-      URL.revokeObjectURL(
-        objectUrl,
-      )
-
-      await audioContext
-        .close()
-        .catch(
-          () => undefined,
-        )
-
-      throw new Error(
-        'Could not create an audio stream from this file.',
-      )
-    }
-
-    /*
-     * Store references BEFORE
-     * publishing so catch/cleanup can
-     * always find them.
-     */
-
-    fileAudioRef.current = audio
-
-    fileAudioTrackRef.current =
-      track
-
-    fileAudioContextRef.current =
-      audioContext
+    fileAudioRef.current =
+      audio
 
     fileAudioUrlRef.current =
       objectUrl
 
+    const context =
+      new AudioContext()
+
+    audioContextRef.current =
+      context
+
+    const source =
+      context.createMediaElementSource(
+        audio,
+      )
+
+    const processedTrack =
+      await buildProcessedTrack(
+        context,
+        source,
+        true,
+      )
+
     try {
-      /*
-       * Resume while we are still
-       * inside the Take AUX user
-       * action.
-       */
-
-      await audioContext.resume()
-
-      /*
-       * Publish generated audio track
-       * to LiveKit.
-       */
-
       await room.localParticipant.publishTrack(
-        track,
+        processedTrack,
         {
           name: 'file-audio',
         },
       )
 
-      /*
-       * Start playback.
-       */
+      setPublishedAudioTrack(
+        processedTrack,
+      )
 
       await audio.play()
 
       setFileIsPlaying(true)
-
-      /*
-       * Automatically stop publishing
-       * once the song reaches the end.
-       */
 
       audio.addEventListener(
         'ended',
@@ -1147,14 +1768,14 @@ function RoomShell({
             'Audio file finished. Pass AUX or choose another source.',
           )
 
-          void stopFileAudio()
+          void stopProcessedAudio()
         },
         {
           once: true,
         },
       )
     } catch (error) {
-      await stopFileAudio()
+      await stopProcessedAudio()
 
       if (
         error instanceof Error
@@ -1261,13 +1882,6 @@ function RoomShell({
       return
     }
 
-    /*
-     * ArcadeLobby can also call
-     * takeAux(), so protect file mode
-     * here as well as disabling the
-     * main button.
-     */
-
     if (
       audioSource === 'file' &&
       !selectedFile
@@ -1280,26 +1894,9 @@ function RoomShell({
     }
 
     setBusy(true)
-
     setDeviceError('')
 
     try {
-      /*
-       * Ask microphone permission only
-       * when using hardware input.
-       */
-
-      if (
-        audioSource ===
-        'interface'
-      ) {
-        await requestAudioPermission()
-      }
-
-      /*
-       * Claim AUX.
-       */
-
       await room.localParticipant.setAttributes(
         {
           [AUX_ATTRIBUTE]:
@@ -1346,10 +1943,6 @@ function RoomShell({
             ),
         )
 
-      /*
-       * Someone else won the AUX race.
-       */
-
       if (
         currentClaims[0]
           ?.participant
@@ -1374,120 +1967,36 @@ function RoomShell({
         return
       }
 
-      /*
-       * AUDIO INTERFACE
-       */
-
       if (
         audioSource ===
         'interface'
       ) {
-        await stopBrowserAudio()
-        await stopFileAudio()
-
-        if (selectedDevice) {
-          await room.switchActiveDevice(
-            'audioinput',
-            selectedDevice,
-          )
-        }
-
-        await room.localParticipant.setMicrophoneEnabled(
-          true,
-          {
-            deviceId:
-              selectedDevice ||
-              undefined,
-
-            echoCancellation:
-              false,
-
-            noiseSuppression:
-              false,
-
-            autoGainControl:
-              false,
-
-            channelCount: 2,
-          },
-        )
-
-        await refreshDevices()
+        await startInterfaceAudio()
 
         setStatusMessage(
-          'You are live from your audio input. Pass AUX when finished.',
+          'You are live from your audio input. Volume, gain and FX can be changed while playing.',
         )
-      }
-
-      /*
-       * BROWSER / TAB AUDIO
-       */
-      else if (
+      } else if (
         audioSource ===
         'browser'
       ) {
-        await room.localParticipant.setMicrophoneEnabled(
-          false,
-        )
-
-        await stopFileAudio()
-
-        await stopBrowserAudio()
-
-        const audioTrack =
-          await requestBrowserAudio()
-
-        await room.localParticipant.publishTrack(
-          audioTrack,
-          {
-            name: 'browser-audio',
-
-            source:
-              Track.Source
-                .ScreenShareAudio,
-          },
-        )
-
-        setBrowserAudioTrack(
-          audioTrack,
-        )
+        await startBrowserAudio()
 
         setStatusMessage(
-          'Browser audio is live. Keep the shared tab playing, then pass AUX when finished.',
+          'Browser audio is live. Volume, gain and FX can be changed while playing.',
         )
-      }
-
-      /*
-       * AUDIO FILE
-       */
-      else {
-        await room.localParticipant.setMicrophoneEnabled(
-          false,
-        )
-
-        await stopBrowserAudio()
-
+      } else {
         await startFileAudio()
 
         setStatusMessage(
           `Playing ${
             selectedFile?.name ??
             'audio file'
-          } on AUX.`,
+          } on AUX. Volume, gain and FX are live.`,
         )
       }
     } catch (error) {
-      await room.localParticipant
-        .setMicrophoneEnabled(
-          false,
-        )
-        .catch(
-          () => undefined,
-        )
-
-      await stopBrowserAudio()
-
-      await stopFileAudio()
+      await stopProcessedAudio()
 
       await room.localParticipant
         .setAttributes({
@@ -1501,7 +2010,7 @@ function RoomShell({
       setDeviceError(
         error instanceof Error
           ? error.message
-          : 'Could not start your audio input.',
+          : 'Could not start your audio source.',
       )
     } finally {
       setBusy(false)
@@ -1520,13 +2029,7 @@ function RoomShell({
     setBusy(true)
 
     try {
-      await room.localParticipant.setMicrophoneEnabled(
-        false,
-      )
-
-      await stopBrowserAudio()
-
-      await stopFileAudio()
+      await stopProcessedAudio()
 
       await room.localParticipant.setAttributes(
         {
@@ -1570,30 +2073,11 @@ function RoomShell({
     deviceId: string,
   ) {
     setSelectedDevice(deviceId)
-
     setDeviceError('')
 
-    if (
-      !iHaveAux ||
-      audioSource !== 'interface'
-    ) {
-      return
-    }
-
-    try {
-      await room.switchActiveDevice(
-        'audioinput',
-        deviceId,
-      )
-
+    if (iHaveAux) {
       setStatusMessage(
-        'Input changed. Your AUX feed is still live.',
-      )
-    } catch (error) {
-      setDeviceError(
-        error instanceof Error
-          ? error.message
-          : 'Could not change audio input.',
+        'Pass AUX before changing the hardware input.',
       )
     }
   }
@@ -1810,6 +2294,7 @@ function RoomShell({
                   }
                   disabled={
                     busy ||
+                    iHaveAux ||
                     devices.length ===
                       0
                   }
@@ -1947,6 +2432,84 @@ function RoomShell({
                 )}
               </div>
             )}
+
+            <div className="aa-fx-panel">
+              <div className="aa-fx-heading">
+                <div>
+                  <p className="aa-kicker">
+                    Live mixer
+                  </p>
+                  <strong>
+                    Player controls
+                  </strong>
+                </div>
+
+                <button
+                  className="aa-text-button aa-fx-reset"
+                  type="button"
+                  onClick={() => {
+                    setVolume(100)
+                    setGainDb(0)
+                    setEchoAmount(0)
+                    setGlitchAmount(0)
+                  }}
+                  disabled={busy}
+                >
+                  Reset FX
+                </button>
+              </div>
+
+              <div className="aa-fx-grid">
+                <FxSlider
+                  label="Volume"
+                  value={volume}
+                  min={0}
+                  max={100}
+                  step={1}
+                  displayValue={`${volume}%`}
+                  onChange={setVolume}
+                  disabled={busy}
+                />
+
+                <FxSlider
+                  label="Gain"
+                  value={gainDb}
+                  min={-12}
+                  max={12}
+                  step={0.5}
+                  displayValue={`${gainDb > 0 ? '+' : ''}${gainDb.toFixed(1)} dB`}
+                  onChange={setGainDb}
+                  disabled={busy}
+                />
+
+                <FxSlider
+                  label="Echo"
+                  value={echoAmount}
+                  min={0}
+                  max={100}
+                  step={1}
+                  displayValue={`${echoAmount}%`}
+                  onChange={setEchoAmount}
+                  disabled={busy}
+                />
+
+                <FxSlider
+                  label="Glitch"
+                  value={glitchAmount}
+                  min={0}
+                  max={100}
+                  step={1}
+                  displayValue={`${glitchAmount}%`}
+                  onChange={setGlitchAmount}
+                  disabled={busy}
+                />
+              </div>
+
+              <p className="aa-muted aa-fx-note">
+                Set these before taking AUX or adjust them live while you are playing.
+                Echo adds a short delay tail; Glitch creates digital chops/dropouts.
+              </p>
+            </div>
 
             {deviceError ? (
               <p className="aa-error">
