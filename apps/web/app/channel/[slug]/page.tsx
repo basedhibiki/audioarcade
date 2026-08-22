@@ -202,9 +202,7 @@ export default function ChannelPage({
     >
       <RoomShell
         roomName={roomName}
-        displayName={
-          joinState.displayName
-        }
+        displayName={joinState.displayName}
       />
 
       <RoomAudioRenderer />
@@ -424,6 +422,9 @@ function RoomShell({
 
   const fileAudioUrlRef =
     useRef<string | null>(null)
+
+  const fileInputRef =
+    useRef<HTMLInputElement | null>(null)
 
   /*
    * GENERAL STATE
@@ -1742,11 +1743,11 @@ function RoomShell({
                     : 'aa-text-button'
                 }
                 type="button"
-                onClick={() =>
-                  setAudioSource(
-                    'file',
-                  )
-                }
+                onClick={() => {
+                  setAudioSource('file')
+                  setDeviceError('')
+                  fileInputRef.current?.click()
+                }}
                 disabled={
                   busy || iHaveAux
                 }
@@ -1754,6 +1755,31 @@ function RoomShell({
                 Audio file
               </button>
             </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.flac,.aif,.aiff"
+              style={{ display: 'none' }}
+              disabled={busy || iHaveAux}
+              onChange={(event) => {
+                const file =
+                  event.currentTarget.files?.[0] ??
+                  null
+
+                setSelectedFile(file)
+                setDeviceError('')
+
+                if (file) {
+                  setAudioSource('file')
+                  setStatusMessage(
+                    `${file.name} ready. Take AUX to play.`,
+                  )
+                }
+
+                event.currentTarget.value = ''
+              }}
+            />
 
             {/*
              * INTERFACE SOURCE
@@ -1891,43 +1917,20 @@ function RoomShell({
                   when you take AUX.
                 </p>
 
-                <label
-                  className="aa-device-label"
-                  htmlFor="audio-file"
-                >
-                  Audio file
-                </label>
-
-                <input
-                  id="audio-file"
-                  type="file"
-                  accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.flac,.aif,.aiff"
-                  onChange={(
-                    event,
-                  ) => {
-                    const file =
-                      event.target
-                        .files?.[0] ??
-                      null
-
-                    setSelectedFile(
-                      file,
-                    )
-
-                    setDeviceError(
-                      '',
-                    )
-
-                    if (file) {
-                      setStatusMessage(
-                        `${file.name} ready. Take AUX to play.`,
-                      )
-                    }
-                  }}
+                <button
+                  type="button"
+                  className="aa-text-button"
+                  onClick={() =>
+                    fileInputRef.current?.click()
+                  }
                   disabled={
                     busy || iHaveAux
                   }
-                />
+                >
+                  {selectedFile
+                    ? 'Choose another file'
+                    : 'Choose audio file'}
+                </button>
 
                 {selectedFile ? (
                   <p className="aa-muted">
