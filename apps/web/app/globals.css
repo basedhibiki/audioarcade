@@ -654,3 +654,972 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   }
 }
 
+/* Audio Arcade AA Tape Deck */
+.aa-tape-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(242, 211, 53, .22);
+  border-radius: .95rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(242, 211, 53, .055), transparent 42%),
+    linear-gradient(180deg, #171314, #0c090a);
+}
+
+.aa-tape-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .8rem;
+}
+
+.aa-tape-heading strong {
+  color: #f7f2df;
+  font-size: .95rem;
+}
+
+.aa-tape-status {
+  min-width: 3.6rem;
+  min-height: 1.65rem;
+  display: inline-grid;
+  place-items: center;
+  padding: .2rem .5rem;
+  border: 1px solid #44393b;
+  border-radius: .35rem;
+  background: #0b0809;
+  color: #8d8285;
+  font-size: .6rem;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+
+.aa-tape-status.is-playing {
+  border-color: rgba(242, 211, 53, .45);
+  color: var(--aa-yellow);
+}
+
+.aa-tape-status.is-recording {
+  border-color: rgba(240, 58, 30, .62);
+  background: rgba(240, 58, 30, .12);
+  color: #ff866f;
+}
+
+.aa-tape-machine {
+  padding: .8rem;
+  border: 1px solid #3a3032;
+  border-radius: .78rem;
+  background:
+    linear-gradient(180deg, #242021, #131011);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .04),
+    inset 0 -.45rem 1rem rgba(0, 0, 0, .25);
+}
+
+.aa-tape-reels {
+  display: grid;
+  grid-template-columns: 1fr minmax(4.5rem, .8fr) 1fr;
+  align-items: center;
+  gap: .8rem;
+  max-width: 24rem;
+  margin: 0 auto;
+}
+
+.aa-tape-reel {
+  justify-self: center;
+  width: clamp(3rem, 8vw, 4.4rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: .45rem solid #0e0c0d;
+  background:
+    radial-gradient(circle, #0c0a0b 0 13%, transparent 14%),
+    repeating-conic-gradient(
+      from 0deg,
+      #81787a 0 8deg,
+      #332e30 8deg 28deg
+    );
+  box-shadow:
+    inset 0 0 0 .16rem #8c8284,
+    0 .2rem .55rem rgba(0, 0, 0, .45);
+}
+
+.aa-tape-machine.is-playing .aa-tape-reel {
+  animation: aaTapeSpin 1.3s linear infinite;
+}
+
+.aa-tape-window {
+  min-height: 3.5rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: .15rem;
+  border: 1px solid #453a3d;
+  border-radius: .42rem;
+  background: #090707;
+  color: var(--aa-yellow);
+  font-variant-numeric: tabular-nums;
+}
+
+.aa-tape-window span {
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.aa-tape-window small {
+  color: #6f6568;
+  font-size: .5rem;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.aa-tape-counter {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-top: .6rem;
+  color: #a69a9d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.aa-tape-progress {
+  --aa-tape-progress: 0%;
+  position: relative;
+  height: .38rem;
+  margin-top: .35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #080607;
+  border: 1px solid #352c2e;
+}
+
+.aa-tape-progress span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--aa-tape-progress);
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, #7c6920, var(--aa-yellow));
+  transition: width .07s linear;
+}
+
+.aa-tape-layer-lights {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .35rem;
+  margin-top: .6rem;
+}
+
+.aa-tape-layer-lights span {
+  min-height: 1.35rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid #30282a;
+  border-radius: .28rem;
+  background: #0d0a0b;
+  color: #665d60;
+  font-size: .52rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.aa-tape-layer-lights span.is-filled {
+  border-color: rgba(242, 211, 53, .36);
+  background: rgba(242, 211, 53, .08);
+  color: var(--aa-yellow);
+}
+
+.aa-tape-transport {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: .45rem;
+  margin-top: .75rem;
+}
+
+.aa-tape-button {
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: .55rem .35rem;
+  border: 1px solid #44383b;
+  border-radius: .48rem;
+  background:
+    linear-gradient(180deg, #282224, #141112);
+  color: #c7bdbf;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+
+.aa-tape-button:not(:disabled):active {
+  transform: translateY(1px);
+  background: #0e0b0c;
+}
+
+.aa-tape-button.is-active {
+  border-color: rgba(242, 211, 53, .62);
+  color: var(--aa-yellow);
+}
+
+.aa-tape-record {
+  color: #ff8d78;
+}
+
+.aa-tape-record > span {
+  width: .45rem;
+  height: .45rem;
+  display: inline-block;
+  margin-right: .28rem;
+  border-radius: 50%;
+  background: #6d2922;
+  vertical-align: -.02rem;
+}
+
+.aa-tape-record.is-active {
+  border-color: rgba(240, 58, 30, .65);
+  background: rgba(240, 58, 30, .11);
+}
+
+.aa-tape-record.is-active > span {
+  background: var(--aa-red);
+  box-shadow: 0 0 .65rem rgba(240, 58, 30, .8);
+}
+
+.aa-tape-knobs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .65rem;
+  margin-top: .7rem;
+}
+
+.aa-tape-knobs .aa-fx-control {
+  background:
+    linear-gradient(180deg, rgba(38, 31, 33, .96), rgba(12, 9, 10, .98));
+}
+
+.aa-tape-footer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: .75rem;
+  margin-top: .75rem;
+}
+
+.aa-tape-monitor {
+  min-height: 2.25rem;
+  padding: .5rem .7rem;
+  border: 1px solid #413639;
+  border-radius: .45rem;
+  background: #100d0e;
+  color: #918689;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.aa-tape-monitor.is-active {
+  border-color: rgba(102, 220, 142, .4);
+  color: #76e39b;
+}
+
+.aa-tape-footer p,
+.aa-tape-note {
+  margin: 0;
+  color: #94888b;
+  font-size: .65rem;
+  line-height: 1.5;
+}
+
+.aa-tape-note {
+  margin-top: .7rem;
+  padding-top: .65rem;
+  border-top: 1px solid #2b2426;
+  color: #786e71;
+}
+
+@keyframes aaTapeSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aa-tape-machine.is-playing .aa-tape-reel {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .aa-tape-transport {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .aa-tape-reels {
+    gap: .55rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .aa-tape-panel {
+    padding: .85rem;
+  }
+
+  .aa-tape-transport {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .aa-tape-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .aa-tape-monitor {
+    width: 100%;
+  }
+
+  .aa-tape-knobs {
+    gap: .45rem;
+  }
+}
+
+/* =========================================================
+   AUDIO ARCADE / COMPACT PRIVATE DECK
+   Minimal industrial room UI + dotted hardware grid
+   ========================================================= */
+
+.aa-room-page {
+  background-color: #080808;
+  background-image:
+    radial-gradient(circle, rgba(242, 211, 53, .16) .7px, transparent .8px);
+  background-size: 15px 15px;
+  background-position: 0 0;
+}
+
+.aa-room-page .aa-card {
+  border-radius: .48rem;
+  background: rgba(10, 10, 10, .95);
+  box-shadow: none;
+  backdrop-filter: blur(10px);
+}
+
+.aa-room-page .aa-aux-card,
+.aa-room-page .aa-participants-card {
+  padding: clamp(.85rem, 2vw, 1.25rem);
+}
+
+.aa-room-page .aa-room-grid {
+  gap: .8rem;
+}
+
+.aa-room-page .aa-status-panel {
+  min-height: 5.4rem;
+  margin: .85rem 0;
+  padding: .8rem .9rem;
+  border-radius: .4rem;
+  background: #111;
+  border-color: #302c24;
+}
+
+.aa-room-page .aa-status-panel.is-yours {
+  background: rgba(242, 211, 53, .08);
+  border-color: rgba(242, 211, 53, .5);
+}
+
+.aa-room-page .aa-status-panel strong {
+  font-size: clamp(1rem, 2.7vw, 1.55rem);
+}
+
+.aa-room-page .aa-status-panel span {
+  font-size: .72rem;
+}
+
+.aa-room-page .aa-source-section {
+  margin-top: .8rem;
+}
+
+.aa-room-page .aa-section-heading {
+  margin-bottom: .5rem;
+}
+
+.aa-room-page .aa-source-grid {
+  gap: .4rem;
+}
+
+.aa-room-page .aa-source-card {
+  min-height: 4.45rem;
+  gap: .15rem;
+  padding: .55rem;
+  border-radius: .35rem;
+  background: #111;
+}
+
+.aa-room-page .aa-source-card.is-active {
+  background: rgba(242, 211, 53, .07);
+}
+
+.aa-room-page .aa-source-card-title {
+  font-size: .72rem;
+}
+
+.aa-room-page .aa-source-card-meta {
+  font-size: .57rem;
+}
+
+.aa-room-page .aa-source-tag {
+  min-height: 1.05rem;
+  padding: .08rem .3rem;
+  font-size: .48rem;
+  border-radius: .18rem;
+}
+
+.aa-room-page .aa-source-panel {
+  margin-top: .45rem;
+  padding: .65rem;
+  border-radius: .35rem;
+  background: rgba(7, 7, 7, .96);
+}
+
+.aa-room-page .aa-source-panel-copy {
+  margin-bottom: .5rem;
+}
+
+.aa-room-page .aa-source-panel-copy p,
+.aa-room-page .aa-source-tip,
+.aa-room-page .aa-source-warning,
+.aa-room-page .aa-browser-tutorial {
+  font-size: .63rem;
+}
+
+.aa-room-page .aa-browser-tutorial {
+  padding: .55rem .65rem;
+  border-radius: .28rem;
+}
+
+.aa-room-page .aa-browser-tutorial ol {
+  margin: .35rem 0;
+}
+
+.aa-deck-ready-bar {
+  margin-top: .55rem;
+  padding: .55rem .65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .7rem;
+  border: 1px solid #302d2a;
+  border-radius: .35rem;
+  background: rgba(8, 8, 8, .97);
+}
+
+.aa-deck-ready-bar > div:first-child {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+}
+
+.aa-deck-dot {
+  width: .55rem;
+  height: .55rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #3d3a34;
+  border: 1px solid #5b564c;
+}
+
+.aa-deck-ready-bar.is-ready .aa-deck-dot {
+  background: var(--aa-yellow);
+  border-color: var(--aa-yellow);
+}
+
+.aa-deck-ready-bar.is-live .aa-deck-dot {
+  background: var(--aa-red);
+  border-color: #ff806a;
+  box-shadow: 0 0 .55rem rgba(240, 58, 30, .5);
+}
+
+.aa-deck-ready-bar strong {
+  display: block;
+  color: #f5f0e1;
+  font-size: .66rem;
+  letter-spacing: .09em;
+}
+
+.aa-deck-ready-bar small {
+  display: block;
+  margin-top: .12rem;
+  color: #807a72;
+  font-size: .56rem;
+  line-height: 1.3;
+}
+
+.aa-deck-ready-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: .35rem;
+}
+
+.aa-prepare-button,
+.aa-deck-close {
+  min-height: 2.2rem;
+  padding: .42rem .65rem;
+  border: 1px solid #4a4437;
+  border-radius: .28rem;
+  background: var(--aa-yellow);
+  color: #111;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.aa-deck-close {
+  background: #111;
+  color: #918b82;
+  border-color: #34312d;
+}
+
+.aa-tool-grid {
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+  gap: .55rem;
+  margin-top: .55rem;
+}
+
+.aa-tool-grid .aa-fx-panel,
+.aa-tool-grid .aa-tape-panel,
+.aa-drum-panel {
+  margin-top: 0;
+  padding: .65rem;
+  border-radius: .4rem;
+  border: 1px solid #302d29;
+  background: rgba(9, 9, 9, .97);
+}
+
+.aa-tool-grid .aa-fx-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .35rem;
+}
+
+.aa-tool-grid .aa-fx-control,
+.aa-tape-knobs .aa-fx-control {
+  padding: .45rem .4rem;
+  gap: .25rem;
+  border-radius: .32rem;
+  background: #111;
+}
+
+.aa-tool-grid .aa-knob-drag-zone,
+.aa-tape-knobs .aa-knob-drag-zone {
+  min-height: 4.7rem;
+}
+
+.aa-tool-grid .aa-knob,
+.aa-tape-knobs .aa-knob {
+  width: 3.55rem;
+}
+
+.aa-tool-grid .aa-fx-label {
+  font-size: .56rem;
+}
+
+.aa-tool-grid .aa-fx-note {
+  margin-bottom: 0;
+  font-size: .58rem;
+}
+
+.aa-tool-grid .aa-tape-heading,
+.aa-drum-heading {
+  margin-bottom: .45rem;
+}
+
+.aa-tool-grid .aa-tape-machine {
+  padding: .5rem;
+  border-radius: .3rem;
+}
+
+.aa-tool-grid .aa-tape-reels {
+  grid-template-columns: 1fr 3.8rem 1fr;
+  gap: .4rem;
+}
+
+.aa-tool-grid .aa-tape-reel {
+  width: clamp(2.2rem, 5vw, 3.2rem);
+  border-width: .34rem;
+}
+
+.aa-tool-grid .aa-tape-window {
+  min-height: 2.65rem;
+}
+
+.aa-tool-grid .aa-tape-transport {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .28rem;
+  margin-top: .45rem;
+}
+
+.aa-tool-grid .aa-tape-button {
+  min-height: 2.15rem;
+  padding: .35rem .25rem;
+  border-radius: .25rem;
+  font-size: .5rem;
+}
+
+.aa-tool-grid .aa-tape-knobs {
+  gap: .35rem;
+  margin-top: .4rem;
+}
+
+.aa-tool-grid .aa-tape-footer {
+  gap: .4rem;
+  margin-top: .4rem;
+}
+
+.aa-tool-grid .aa-tape-footer p,
+.aa-tool-grid .aa-tape-note {
+  font-size: .56rem;
+}
+
+.aa-tool-grid .aa-tape-note {
+  margin-top: .4rem;
+  padding-top: .4rem;
+}
+
+/* AA-04 drum pads */
+.aa-drum-panel {
+  margin-top: .55rem;
+}
+
+.aa-drum-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.aa-drum-heading > div:first-child > strong {
+  font-size: .9rem;
+  letter-spacing: .12em;
+}
+
+.aa-tempo-control {
+  min-width: min(12rem, 46%);
+}
+
+.aa-tempo-control label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .4rem;
+  margin-bottom: .18rem;
+  color: #8b857d;
+  font-size: .52rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.aa-tempo-control label strong {
+  color: var(--aa-yellow);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .78rem;
+}
+
+.aa-tempo-control input[type='range'] {
+  width: 100%;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--aa-yellow);
+}
+
+.aa-drum-pads {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .38rem;
+  margin-top: .55rem;
+}
+
+.aa-drum-pad-cell {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .22rem;
+}
+
+.aa-drum-pad {
+  min-width: 0;
+  min-height: 5rem;
+  display: grid;
+  align-content: space-between;
+  justify-items: start;
+  gap: .15rem;
+  padding: .55rem;
+  border: 1px solid #3a3731;
+  border-radius: .3rem;
+  background: #141414;
+  color: #8c8880;
+  text-align: left;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.aa-drum-pad.is-loaded {
+  border-color: #625c48;
+  color: #f0eadb;
+}
+
+.aa-drum-pad.is-loaded:not(:disabled):active {
+  background: var(--aa-yellow);
+  color: #111;
+  transform: translateY(1px);
+}
+
+.aa-drum-pad > span {
+  color: var(--aa-yellow);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .62rem;
+  font-weight: 900;
+}
+
+.aa-drum-pad > strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .65rem;
+}
+
+.aa-drum-pad > small {
+  color: #6d6861;
+  font-size: .5rem;
+  letter-spacing: .08em;
+}
+
+.aa-drum-pad-tools {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: .2rem;
+}
+
+.aa-drum-pad-tools button {
+  min-width: 2.15rem;
+  padding: .25rem;
+  border: 1px solid #34312d;
+  border-radius: .22rem;
+  background: #0d0d0d;
+  color: #8a847b;
+  font-size: .48rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.aa-drum-pad-tools button:first-child {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  letter-spacing: .08em;
+}
+
+.aa-sequencer-bar {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin-top: .55rem;
+  padding-top: .5rem;
+  border-top: 1px solid #292724;
+}
+
+.aa-sequencer-bar > span {
+  color: #716c65;
+  font-size: .52rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.aa-seq-play,
+.aa-seq-clear {
+  min-height: 2rem;
+  padding: .35rem .55rem;
+  border: 1px solid #3b3731;
+  border-radius: .25rem;
+  background: #111;
+  color: #a29c92;
+  font-size: .52rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.aa-seq-play.is-active {
+  border-color: var(--aa-yellow);
+  color: var(--aa-yellow);
+}
+
+.aa-seq-clear {
+  margin-left: auto;
+}
+
+.aa-step-grid {
+  margin-top: .45rem;
+  overflow-x: auto;
+  padding-bottom: .15rem;
+}
+
+.aa-step-row {
+  min-width: 22rem;
+  display: grid;
+  grid-template-columns: 1.55rem repeat(8, minmax(2.15rem, 1fr));
+  gap: .22rem;
+  align-items: center;
+}
+
+.aa-step-row + .aa-step-row {
+  margin-top: .22rem;
+}
+
+.aa-step-row > span {
+  color: #716c65;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .5rem;
+  font-weight: 900;
+}
+
+.aa-step-row button {
+  position: relative;
+  min-height: 2rem;
+  border: 1px solid #302e2a;
+  border-radius: .18rem;
+  background: #111;
+  color: #595650;
+  font-size: .45rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.aa-step-row button:nth-of-type(2n + 1) {
+  background: #141414;
+}
+
+.aa-step-row button.is-active {
+  border-color: #827a5d;
+  background: rgba(242, 211, 53, .13);
+  color: var(--aa-yellow);
+}
+
+.aa-step-row button.is-playhead::after {
+  content: '';
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: .16rem;
+  height: 2px;
+  background: var(--aa-red);
+}
+
+.aa-drum-note {
+  margin: .45rem 0 0;
+  color: #777168;
+  font-size: .56rem;
+  line-height: 1.4;
+}
+
+.aa-room-page .aa-actions {
+  margin-top: .6rem;
+}
+
+.aa-room-page .aa-take-button {
+  min-height: 3.3rem;
+}
+
+@media (max-width: 980px) {
+  .aa-tool-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .aa-tool-grid .aa-fx-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .aa-room-page {
+    padding: .75rem;
+  }
+
+  .aa-room-page .aa-source-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .aa-source-card-meta {
+    display: none;
+  }
+
+  .aa-deck-ready-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .aa-deck-ready-actions {
+    width: 100%;
+  }
+
+  .aa-deck-ready-actions button {
+    flex: 1;
+  }
+
+  .aa-tool-grid .aa-fx-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .aa-drum-pads {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .aa-drum-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .aa-tempo-control {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .aa-room-page .aa-source-card {
+    padding: .42rem;
+  }
+
+  .aa-room-page .aa-source-card-title {
+    font-size: .62rem;
+  }
+
+  .aa-tool-grid .aa-tape-transport {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .aa-sequencer-bar {
+    flex-wrap: wrap;
+  }
+
+  .aa-seq-clear {
+    margin-left: 0;
+  }
+}
+
+
+.aa-room-page .aa-room-header {
+  margin-bottom: .65rem;
+}
+
+.aa-room-page .aa-room-header h1 {
+  font-size: clamp(1.65rem, 4vw, 2.8rem);
+}
+
+.aa-room-page .aa-card-heading h2 {
+  font-size: clamp(1.15rem, 3vw, 1.7rem);
+}
+
+.aa-signal-row .is-private {
+  color: var(--aa-yellow);
+}
