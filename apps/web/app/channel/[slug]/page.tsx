@@ -60,8 +60,10 @@ type PadSample = {
 
 const TAPE_MAX_SECONDS = 8
 const TAPE_MAX_LAYERS = 4
-const DRUM_PAD_COUNT = 4
+const DRUM_PAD_COUNT = 6
 const DRUM_STEP_COUNT = 8
+const DRUM_PATTERN_COUNT = 1
+const PAD_MAX_SECONDS = 4
 
 const AUX_ATTRIBUTE = 'audioArcadeAuxClaim'
 
@@ -1232,31 +1234,64 @@ function RoomShell({
     )
 
   const [
-    drumPattern,
-    setDrumPattern,
-  ] = useState<boolean[][]>(
+    drumPatterns,
+    setDrumPatterns,
+  ] = useState<boolean[][][]>(
     () =>
       Array.from(
-        { length: DRUM_PAD_COUNT },
+        { length: DRUM_PATTERN_COUNT },
         () =>
           Array.from(
-            { length: DRUM_STEP_COUNT },
-            () => false,
+            { length: DRUM_PAD_COUNT },
+            () =>
+              Array.from(
+                { length: DRUM_STEP_COUNT },
+                () => false,
+              ),
           ),
       ),
   )
 
-  const drumPatternRef =
-    useRef<boolean[][]>(
+  const drumPatternsRef =
+    useRef<boolean[][][]>(
       Array.from(
-        { length: DRUM_PAD_COUNT },
+        { length: DRUM_PATTERN_COUNT },
         () =>
           Array.from(
-            { length: DRUM_STEP_COUNT },
-            () => false,
+            { length: DRUM_PAD_COUNT },
+            () =>
+              Array.from(
+                { length: DRUM_STEP_COUNT },
+                () => false,
+              ),
           ),
       ),
     )
+
+  const [
+    activePatternIndex,
+    setActivePatternIndex,
+  ] = useState(0)
+
+  const activePatternIndexRef =
+    useRef(0)
+
+  const drumPattern =
+    drumPatterns[activePatternIndex]
+
+  const [
+    recordingPadIndex,
+    setRecordingPadIndex,
+  ] = useState<number | null>(null)
+
+  const padRecorderRef =
+    useRef<MediaRecorder | null>(null)
+
+  const padRecordChunksRef =
+    useRef<Blob[]>([])
+
+  const padRecordTimerRef =
+    useRef<number | null>(null)
 
   const [tempo, setTempo] =
     useState(92)
@@ -1285,6 +1320,11 @@ function RoomShell({
       [],
     )
 
+  const [
+    activeRoomTab,
+    setActiveRoomTab,
+  ] = useState<'aux' | 'sampler'>('aux')
+
   /*
    * GENERAL STATE
    */
@@ -1296,7 +1336,7 @@ function RoomShell({
     statusMessage,
     setStatusMessage,
   ] = useState(
-    'Prepare a private deck, build a tape or sequence, then take AUX when it is free.',
+    'Prepare a private deck, record pads or build a pattern, then take AUX when it is free.',
   )
 
   const [
@@ -2799,8 +2839,31 @@ function RoomShell({
   function setDrumPatternSafe(
     next: boolean[][],
   ) {
-    drumPatternRef.current = next
-    setDrumPattern(next)
+    const patterns =
+      drumPatternsRef.current.map(
+        (pattern, index) =>
+          index ===
+          activePatternIndexRef.current
+            ? next.map((row) => [...row])
+            : pattern.map((row) => [...row]),
+      )
+
+    drumPatternsRef.current = patterns
+    setDrumPatterns(patterns)
+  }
+
+  function choosePattern(
+    patternIndex: number,
+  ) {
+    activePatternIndexRef.current =
+      patternIndex
+
+    setActivePatternIndex(
+      patternIndex,
+    )
+
+    drumStepRef.current = 0
+    setCurrentDrumStep(-1)
   }
 
   function stopDrumSources() {
@@ -2954,6 +3017,187 @@ function RoomShell({
     )
   }
 
+  function stopPadRecording() {
+    if (
+      padRecordTimerRef.current !== null
+    ) {
+      window.clearTimeout(
+        padRecordTimerRef.current,
+      )
+      padRecordTimerRef.current = null
+    }
+
+    const recorder =
+      padRecorderRef.current
+
+    if (
+      recorder &&
+      recorder.state !== 'inactive'
+    ) {
+      recorder.stop()
+    }
+  }
+
+  async function recordPadSample(
+    padIndex: number,
+  ) {
+    if (
+      recordingPadIndex === padIndex
+    ) {
+      stopPadRecording()
+      return
+    }
+
+    if (recordingPadIndex !== null) {
+      setDeviceError(
+        'Finish the current pad recording first.',
+      )
+      return
+    }
+
+    const context =
+      audioContextRef.current
+
+    const captureStream =
+      samplerCaptureStreamRef.current
+
+    if (
+      !context ||
+      !captureStream ||
+      !deckReady
+    ) {
+      setDeviceError(
+        'Prepare your private source before recording a pad.',
+      )
+      return
+    }
+
+    if (
+      typeof MediaRecorder === 'undefined'
+    ) {
+      setDeviceError(
+        'This browser does not support pad recording.',
+      )
+      return
+    }
+
+    setDeviceError('')
+    await context.resume()
+
+    const mimeType =
+      preferredTapeMimeType()
+
+    const recorder =
+      mimeType
+        ? new MediaRecorder(
+            captureStream,
+            { mimeType },
+          )
+        : new MediaRecorder(
+            captureStream,
+          )
+
+    const chunks: Blob[] = []
+    padRecordChunksRef.current = chunks
+
+    recorder.addEventListener(
+      'dataavailable',
+      (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data)
+        }
+      },
+    )
+
+    recorder.addEventListener(
+      'stop',
+      () => {
+        const stoppedChunks = [
+          ...padRecordChunksRef.current,
+        ]
+
+        const stoppedMime =
+          recorder.mimeType
+
+        padRecorderRef.current = null
+        setRecordingPadIndex(null)
+
+        void (async () => {
+          const blob = new Blob(
+            stoppedChunks,
+            stoppedMime
+              ? { type: stoppedMime }
+              : undefined,
+          )
+
+          if (blob.size === 0) {
+            throw new Error(
+              'No audio reached the pad recorder.',
+            )
+          }
+
+          const decoded =
+            await context.decodeAudioData(
+              (await blob.arrayBuffer()).slice(0),
+            )
+
+          if (decoded.duration < 0.08) {
+            throw new Error(
+              'That pad sample was too short.',
+            )
+          }
+
+          const duration = Math.min(
+            PAD_MAX_SECONDS,
+            decoded.duration,
+          )
+
+          const buffer =
+            copyBufferToDuration(
+              context,
+              decoded,
+              duration,
+            )
+
+          const sample: PadSample = {
+            id: crypto.randomUUID(),
+            name: `PAD ${padIndex + 1}`,
+            buffer,
+            reversedBuffer:
+              reverseAudioBuffer(
+                context,
+                buffer,
+              ),
+          }
+
+          const next = [
+            ...padSamplesRef.current,
+          ]
+
+          next[padIndex] = sample
+          setPadSamplesSafe(next)
+        })().catch((error) => {
+          setDeviceError(
+            error instanceof Error
+              ? error.message
+              : 'Could not record the pad.',
+          )
+        })
+      },
+      { once: true },
+    )
+
+    padRecorderRef.current = recorder
+    setRecordingPadIndex(padIndex)
+    recorder.start()
+
+    padRecordTimerRef.current =
+      window.setTimeout(
+        stopPadRecording,
+        PAD_MAX_SECONDS * 1000,
+      )
+  }
+
   function clearPad(
     padIndex: number,
   ) {
@@ -2964,25 +3208,32 @@ function RoomShell({
     next[padIndex] = null
     setPadSamplesSafe(next)
 
-    const nextPattern =
-      drumPatternRef.current.map(
-        (row, index) =>
-          index === padIndex
-            ? row.map(() => false)
-            : [...row],
+    const patterns =
+      drumPatternsRef.current.map(
+        (pattern) =>
+          pattern.map(
+            (row, index) =>
+              index === padIndex
+                ? row.map(() => false)
+                : [...row],
+          ),
       )
 
-    setDrumPatternSafe(
-      nextPattern,
-    )
+    drumPatternsRef.current = patterns
+    setDrumPatterns(patterns)
   }
 
   function toggleDrumStep(
     padIndex: number,
     stepIndex: number,
   ) {
+    const current =
+      drumPatternsRef.current[
+        activePatternIndexRef.current
+      ]
+
     const next =
-      drumPatternRef.current.map(
+      current.map(
         (row) => [...row],
       )
 
@@ -3042,9 +3293,9 @@ function RoomShell({
       padIndex += 1
     ) {
       if (
-        drumPatternRef.current[
-          padIndex
-        ]?.[stepIndex]
+        drumPatternsRef.current[
+          activePatternIndexRef.current
+        ]?.[padIndex]?.[stepIndex]
       ) {
         triggerPad(
           padIndex,
@@ -3076,7 +3327,7 @@ function RoomShell({
       )
     ) {
       setDeviceError(
-        'Load at least one tape sample into a pad first.',
+        'Record at least one pad sample first.',
       )
 
       return
@@ -3156,7 +3407,7 @@ function RoomShell({
       }
 
       const padIndex =
-        ['1', '2', '3', '4'].indexOf(
+        ['1', '2', '3', '4', '5', '6'].indexOf(
           event.key,
         )
 
@@ -4398,12 +4649,22 @@ function RoomShell({
     <>
       <main className="aa-page aa-room-page">
         <header className="aa-room-header">
-          <div>
-            <p className="aa-kicker">
-              Audio Arcade / live room
-            </p>
+          <div className="aa-brand-block">
+            <img
+              className="aa-brand-logo"
+              src="/audio-arcade-logo.png"
+              alt="Audio Arcade"
+            />
 
-            <h1>{roomName}</h1>
+            <div>
+              <p className="aa-kicker">
+                Live room
+              </p>
+
+              <strong className="aa-room-title">
+                {roomName}
+              </strong>
+            </div>
           </div>
 
           <div
@@ -4446,6 +4707,34 @@ function RoomShell({
             </div>
 
             <div
+              className="aa-room-tabs"
+              role="tablist"
+              aria-label="Audio Arcade room controls"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeRoomTab === 'aux'}
+                className={activeRoomTab === 'aux' ? 'is-active' : ''}
+                onClick={() => setActiveRoomTab('aux')}
+              >
+                AUX Control
+              </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeRoomTab === 'sampler'}
+                className={activeRoomTab === 'sampler' ? 'is-active' : ''}
+                onClick={() => setActiveRoomTab('sampler')}
+              >
+                Sampler
+              </button>
+            </div>
+
+            {activeRoomTab === 'aux' ? (
+              <>
+            <div
               className={`aa-status-panel ${
                 iHaveAux
                   ? 'is-yours'
@@ -4467,6 +4756,83 @@ function RoomShell({
               </span>
             </div>
 
+            {/*
+             * AUX CONTROLS
+             */}
+
+            <div className="aa-actions">
+              <button
+                className="aa-primary aa-take-button"
+                type="button"
+                onClick={() =>
+                  void takeAux()
+                }
+                disabled={
+                  !auxAvailable ||
+                  !isConnected ||
+                  busy ||
+                  (audioSource ===
+                    'file' &&
+                    !selectedFile)
+                }
+              >
+                {busy && !iHaveAux
+                  ? 'Taking AUX…'
+                  : deckReady &&
+                      preparedSource ===
+                        audioSource
+                    ? 'Take AUX'
+                    : 'Prepare + Take AUX'}
+              </button>
+
+              <button
+                className="aa-danger"
+                type="button"
+                onClick={() =>
+                  void passAux()
+                }
+                disabled={
+                  !iHaveAux ||
+                  busy
+                }
+              >
+                {busy && iHaveAux
+                  ? 'Passing…'
+                  : 'Pass AUX'}
+              </button>
+            </div>
+
+            <div className="aa-signal-row">
+              <span
+                className={
+                  isPublishing
+                    ? 'is-on'
+                    : deckReady
+                      ? 'is-private'
+                      : ''
+                }
+              >
+                {(preparedSource ??
+                  audioSource) ===
+                'browser'
+                  ? 'Browser audio'
+                  : (preparedSource ??
+                        audioSource) ===
+                      'file'
+                    ? 'Audio file'
+                    : 'Input'}{' '}
+                {isPublishing
+                  ? 'ON AIR'
+                  : deckReady
+                    ? 'PRIVATE'
+                    : 'OFF'}
+              </span>
+
+              <span>
+                Signed in as{' '}
+                {displayName}
+              </span>
+            </div>
             {/*
              * SOURCE SELECTOR
              */}
@@ -4938,449 +5304,30 @@ function RoomShell({
               </div>
             </div>
 
-            <div className="aa-tool-grid">
-            <div className="aa-fx-panel">
-              <div className="aa-fx-heading">
-                <div>
-                  <p className="aa-kicker">
-                    Live mixer
-                  </p>
-
-                  <strong>
-                    Player controls
-                  </strong>
-                </div>
-
-                <button
-                  className="aa-text-button aa-fx-reset"
-                  type="button"
-                  onClick={() => {
-                    setVolume(100)
-                    setGainDb(0)
-                    setEchoAmount(0)
-                    setGlitchAmount(0)
-                  }}
-                  disabled={busy}
-                >
-                  Reset FX
-                </button>
-              </div>
-
-              <div className="aa-fx-grid">
-                <FxSlider
-                  label="Volume"
-                  value={volume}
-                  min={0}
-                  max={100}
-                  step={1}
-                  displayValue={`${volume}%`}
-                  onChange={setVolume}
-                  disabled={busy}
-                />
-
-                <FxSlider
-                  label="Gain"
-                  value={gainDb}
-                  min={-12}
-                  max={12}
-                  step={0.5}
-                  displayValue={`${gainDb > 0 ? '+' : ''}${gainDb.toFixed(1)} dB`}
-                  onChange={setGainDb}
-                  disabled={busy}
-                />
-
-                <FxSlider
-                  label="Echo"
-                  value={echoAmount}
-                  min={0}
-                  max={100}
-                  step={1}
-                  displayValue={`${echoAmount}%`}
-                  onChange={setEchoAmount}
-                  disabled={busy}
-                />
-
-                <FxSlider
-                  label="Glitch"
-                  value={glitchAmount}
-                  min={0}
-                  max={100}
-                  step={1}
-                  displayValue={`${glitchAmount}%`}
-                  onChange={setGlitchAmount}
-                  disabled={busy}
-                />
-              </div>
-
-              <p className="aa-muted aa-fx-note">
-                Drag knobs left or right. These affect your private deck and the same signal when you go on air.
+            {deviceError ? (
+              <p className="aa-error">
+                {deviceError}
               </p>
-            </div>
+            ) : null}
 
-            <div className="aa-tape-panel">
-              <div className="aa-tape-heading">
-                <div>
-                  <p className="aa-kicker">
-                    Short sampler
-                  </p>
-
-                  <strong>
-                    AA Tape Deck
-                  </strong>
-                </div>
-
-                <span
-                  className={`aa-tape-status ${
-                    tapeRecording
-                      ? 'is-recording'
-                      : tapePlaying
-                        ? 'is-playing'
-                        : ''
-                  }`}
-                >
-                  {tapeRecording
-                    ? tapeRecording ===
-                      'new'
-                      ? 'REC'
-                      : 'DUB'
-                    : tapePlaying
-                      ? 'PLAY'
-                      : tapeLayers.length >
-                          0
-                        ? 'READY'
-                        : 'EMPTY'}
-                </span>
-              </div>
-
-              <div
-                className={`aa-tape-machine ${
-                  tapePlaying
-                    ? 'is-playing'
-                    : ''
-                }`}
-              >
-                <div className="aa-tape-reels">
-                  <span className="aa-tape-reel" />
-                  <span className="aa-tape-window">
-                    <span>
-                      {tapeLayers.length}/
-                      {TAPE_MAX_LAYERS}
-                    </span>
-                    <small>
-                      LAYERS
-                    </small>
-                  </span>
-                  <span className="aa-tape-reel" />
-                </div>
-
-                <div className="aa-tape-counter">
-                  <span>
-                    {formatTapeTime(
-                      tapeProgress *
-                        tapeLoopSeconds,
-                    )}
-                  </span>
-
-                  <span>
-                    {tapeLoopSeconds >
-                    0
-                      ? formatTapeTime(
-                          tapeLoopSeconds,
-                        )
-                      : `${TAPE_MAX_SECONDS}.0`}
-                    s
-                  </span>
-                </div>
-
-                <div
-                  className="aa-tape-progress"
-                  aria-label="Tape playhead"
-                  style={{
-                    '--aa-tape-progress':
-                      `${Math.min(
-                        100,
-                        Math.max(
-                          0,
-                          tapeProgress *
-                            100,
-                        ),
-                      )}%`,
-                  } as CSSProperties}
-                >
-                  <span />
-                </div>
-
-                <div className="aa-tape-layer-lights">
-                  {Array.from({
-                    length:
-                      TAPE_MAX_LAYERS,
-                  }).map(
-                    (_, index) => (
-                      <span
-                        key={index}
-                        className={
-                          index <
-                          tapeLayers.length
-                            ? 'is-filled'
-                            : ''
-                        }
-                      >
-                        L{index + 1}
-                      </span>
-                    ),
-                  )}
-                </div>
-              </div>
-
-              <div className="aa-tape-transport">
-                <button
-                  type="button"
-                  className={`aa-tape-button aa-tape-record ${
-                    tapeRecording ===
-                    'new'
-                      ? 'is-active'
-                      : ''
-                  }`}
-                  onClick={() => {
-                    setDeviceError('')
-
-                    if (
-                      tapeRecording ===
-                      'new'
-                    ) {
-                      stopTapeRecording()
-                      return
-                    }
-
-                    void beginTapeRecording(
-                      'new',
-                    ).catch(
-                      (error) => {
-                        setDeviceError(
-                          error instanceof
-                            Error
-                            ? error.message
-                            : 'Could not start tape recording.',
-                        )
-                      },
-                    )
-                  }}
-                  disabled={
-                    (!deckReady &&
-                      tapeRecording !==
-                        'new') ||
-                    tapeRecording ===
-                      'overdub'
-                  }
-                >
-                  <span />
-                  {tapeRecording ===
-                  'new'
-                    ? 'Stop REC'
-                    : 'New REC'}
-                </button>
-
-                <button
-                  type="button"
-                  className={`aa-tape-button ${
-                    tapeRecording ===
-                    'overdub'
-                      ? 'is-active'
-                      : ''
-                  }`}
-                  onClick={() => {
-                    setDeviceError('')
-
-                    void beginTapeRecording(
-                      'overdub',
-                    ).catch(
-                      (error) => {
-                        setDeviceError(
-                          error instanceof
-                            Error
-                            ? error.message
-                            : 'Could not overdub the tape.',
-                        )
-                      },
-                    )
-                  }}
-                  disabled={
-                    !deckReady ||
-                    tapeLayers.length ===
-                      0 ||
-                    tapeLayers.length >=
-                      TAPE_MAX_LAYERS ||
-                    tapeRecording !==
-                      null ||
-                    Math.abs(
-                      tapeSpeed - 1,
-                    ) > 0.001
-                  }
-                >
-                  Overdub
-                </button>
-
-                <button
-                  type="button"
-                  className={`aa-tape-button ${
-                    tapePlaying
-                      ? 'is-active'
-                      : ''
-                  }`}
-                  onClick={() =>
-                    void toggleTapePlay()
-                  }
-                  disabled={
-                    !deckReady ||
-                    tapeLayers.length ===
-                      0 ||
-                    tapeRecording ===
-                      'new'
-                  }
-                >
-                  {tapePlaying
-                    ? 'Stop'
-                    : 'Play'}
-                </button>
-
-                <button
-                  type="button"
-                  className={`aa-tape-button ${
-                    tapeReverse
-                      ? 'is-active'
-                      : ''
-                  }`}
-                  onClick={() =>
-                    void toggleTapeReverse()
-                  }
-                  disabled={
-                    tapeLayers.length ===
-                      0 ||
-                    tapeRecording !==
-                      null
-                  }
-                >
-                  Reverse
-                </button>
-
-                <button
-                  type="button"
-                  className="aa-tape-button"
-                  onClick={() =>
-                    void undoTapeLayer()
-                  }
-                  disabled={
-                    tapeLayers.length ===
-                      0 ||
-                    tapeRecording !==
-                      null
-                  }
-                >
-                  Undo
-                </button>
-
-                <button
-                  type="button"
-                  className="aa-tape-button"
-                  onClick={
-                    clearTape
-                  }
-                  disabled={
-                    tapeLayers.length ===
-                      0 &&
-                    tapeRecording ===
-                      null
-                  }
-                >
-                  Clear
-                </button>
-              </div>
-
-              <div className="aa-tape-knobs">
-                <FxSlider
-                  label="Tape speed"
-                  value={tapeSpeed}
-                  min={0.5}
-                  max={1.5}
-                  step={0.01}
-                  displayValue={`${tapeSpeed.toFixed(
-                    2,
-                  )}x`}
-                  onChange={
-                    setTapeSpeed
-                  }
-                  disabled={
-                    tapeRecording !==
-                    null
-                  }
-                />
-
-                <FxSlider
-                  label="Tape wear"
-                  value={tapeWear}
-                  min={0}
-                  max={100}
-                  step={1}
-                  displayValue={`${tapeWear}%`}
-                  onChange={
-                    setTapeWear
-                  }
-                />
-              </div>
-
-              <div className="aa-tape-footer">
-                <button
-                  type="button"
-                  className={`aa-tape-monitor ${
-                    tapeMonitor ||
-                    (preparedSource ===
-                      'file' &&
-                      deckReady)
-                      ? 'is-active'
-                      : ''
-                  }`}
-                  onClick={() =>
-                    setTapeMonitor(
-                      (current) =>
-                        !current,
-                    )
-                  }
-                  disabled={
-                    !deckReady ||
-                    preparedSource ===
-                      'file'
-                  }
-                >
-                  {preparedSource ===
-                    'file' &&
-                  deckReady
-                    ? 'Monitor auto'
-                    : tapeMonitor
-                      ? 'Monitor on'
-                      : 'Monitor off'}
-                </button>
-
-                <p>
-                  {tapeMessage}
-                </p>
-              </div>
-
-              <p className="aa-tape-note">
-                Private until you own AUX. New REC replaces the current tape; Overdub adds a layer. Load any tape state into a drum pad below. Return Tape Speed to 1.00x before overdubbing.
-              </p>
-            </div>
-
-            </div>
+              </>
+            ) : (
+              <>
+                {!deckReady ? (
+                  <div className="aa-sampler-hint">
+                    Prepare an input in AUX Control before recording pads.
+                  </div>
+                ) : null}
 
             <div className="aa-drum-panel">
               <div className="aa-drum-heading">
                 <div>
                   <p className="aa-kicker">
-                    Tape pads / sequencer
+                    Beat machine + FX
                   </p>
 
                   <strong>
-                    AA-04
+                    AA-06
                   </strong>
                 </div>
 
@@ -5422,6 +5369,11 @@ function RoomShell({
                           sample
                             ? 'is-loaded'
                             : ''
+                        } ${
+                          recordingPadIndex ===
+                          padIndex
+                            ? 'is-recording'
+                            : ''
                         }`}
                         onClick={() => {
                           if (sample) {
@@ -5432,7 +5384,9 @@ function RoomShell({
                         }}
                         disabled={
                           !sample ||
-                          !deckReady
+                          !deckReady ||
+                          recordingPadIndex !==
+                            null
                         }
                         aria-label={`Trigger pad ${
                           padIndex + 1
@@ -5448,38 +5402,53 @@ function RoomShell({
                         </span>
 
                         <strong>
-                          {sample
-                            ? sample.name
-                            : 'EMPTY'}
+                          {recordingPadIndex ===
+                          padIndex
+                            ? 'RECORDING'
+                            : sample
+                              ? sample.name
+                              : 'EMPTY'}
                         </strong>
 
                         <small>
-                          {sample
-                            ? `${formatTapeTime(
-                                sample.buffer
-                                  .duration,
-                              )}s`
-                            : 'SET TAPE'}
+                          {recordingPadIndex ===
+                          padIndex
+                            ? `MAX ${PAD_MAX_SECONDS}s`
+                            : sample
+                              ? `${formatTapeTime(
+                                  sample.buffer
+                                    .duration,
+                                )}s`
+                              : 'REC SOURCE'}
                         </small>
                       </button>
 
                       <div className="aa-drum-pad-tools">
                         <button
                           type="button"
+                          className={
+                            recordingPadIndex ===
+                            padIndex
+                              ? 'is-recording'
+                              : ''
+                          }
                           onClick={() =>
-                            loadTapeIntoPad(
+                            void recordPadSample(
                               padIndex,
                             )
                           }
                           disabled={
                             !deckReady ||
-                            tapeLayers.length ===
-                              0 ||
-                            tapeRecording !==
-                              null
+                            (recordingPadIndex !==
+                              null &&
+                              recordingPadIndex !==
+                                padIndex)
                           }
                         >
-                          Set
+                          {recordingPadIndex ===
+                          padIndex
+                            ? 'Stop'
+                            : 'Rec'}
                         </button>
 
                         <button
@@ -5491,12 +5460,78 @@ function RoomShell({
                           }
                           disabled={!sample}
                         >
-                          −
+                          Clear
                         </button>
                       </div>
                     </div>
                   ),
                 )}
+              </div>
+
+              <div className="aa-drum-fx">
+                <div className="aa-drum-fx-heading">
+                  <span>FX</span>
+
+                  <button
+                    className="aa-text-button aa-fx-reset"
+                    type="button"
+                    onClick={() => {
+                      setVolume(100)
+                      setGainDb(0)
+                      setEchoAmount(0)
+                      setGlitchAmount(0)
+                    }}
+                    disabled={busy}
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                <div className="aa-fx-grid">
+                  <FxSlider
+                    label="Volume"
+                    value={volume}
+                    min={0}
+                    max={100}
+                    step={1}
+                    displayValue={`${volume}%`}
+                    onChange={setVolume}
+                    disabled={busy}
+                  />
+
+                  <FxSlider
+                    label="Gain"
+                    value={gainDb}
+                    min={-12}
+                    max={12}
+                    step={0.5}
+                    displayValue={`${gainDb > 0 ? '+' : ''}${gainDb.toFixed(1)} dB`}
+                    onChange={setGainDb}
+                    disabled={busy}
+                  />
+
+                  <FxSlider
+                    label="Echo"
+                    value={echoAmount}
+                    min={0}
+                    max={100}
+                    step={1}
+                    displayValue={`${echoAmount}%`}
+                    onChange={setEchoAmount}
+                    disabled={busy}
+                  />
+
+                  <FxSlider
+                    label="Glitch"
+                    value={glitchAmount}
+                    min={0}
+                    max={100}
+                    step={1}
+                    displayValue={`${glitchAmount}%`}
+                    onChange={setGlitchAmount}
+                    disabled={busy}
+                  />
+                </div>
               </div>
 
               <div className="aa-sequencer-bar">
@@ -5508,9 +5543,7 @@ function RoomShell({
                       : ''
                   }`}
                   onClick={() => {
-                    if (
-                      sequencerPlaying
-                    ) {
+                    if (sequencerPlaying) {
                       stopSequencerClock()
                     } else {
                       startSequencerClock()
@@ -5520,19 +5553,17 @@ function RoomShell({
                 >
                   {sequencerPlaying
                     ? '■ Stop'
-                    : '▶ Seq'}
+                    : '▶ Play'}
                 </button>
 
                 <span>
-                  8 steps / 1⁄8
+                  8 steps
                 </span>
 
                 <button
                   type="button"
                   className="aa-seq-clear"
-                  onClick={
-                    clearDrumPattern
-                  }
+                  onClick={clearDrumPattern}
                 >
                   Clear pattern
                 </button>
@@ -5553,10 +5584,7 @@ function RoomShell({
                       </span>
 
                       {row.map(
-                        (
-                          active,
-                          stepIndex,
-                        ) => (
+                        (active, stepIndex) => (
                           <button
                             type="button"
                             key={stepIndex}
@@ -5586,9 +5614,7 @@ function RoomShell({
                             }, step ${
                               stepIndex + 1
                             }`}
-                            aria-pressed={
-                              active
-                            }
+                            aria-pressed={active}
                           >
                             {stepIndex + 1}
                           </button>
@@ -5600,7 +5626,7 @@ function RoomShell({
               </div>
 
               <p className="aa-drum-note">
-                SET stores a snapshot of the current tape on a pad. Tap pads or use keys 1–4. The 8-step sequence follows the BPM slider and stays private until you take AUX.
+                Prepare a source, record up to six short pad samples, then build an 8-step sequence. Pads and FX stay private until you take AUX. Keyboard shortcuts: 1–6.
               </p>
             </div>
 
@@ -5610,83 +5636,8 @@ function RoomShell({
               </p>
             ) : null}
 
-            {/*
-             * AUX CONTROLS
-             */}
-
-            <div className="aa-actions">
-              <button
-                className="aa-primary aa-take-button"
-                type="button"
-                onClick={() =>
-                  void takeAux()
-                }
-                disabled={
-                  !auxAvailable ||
-                  !isConnected ||
-                  busy ||
-                  (audioSource ===
-                    'file' &&
-                    !selectedFile)
-                }
-              >
-                {busy && !iHaveAux
-                  ? 'Taking AUX…'
-                  : deckReady &&
-                      preparedSource ===
-                        audioSource
-                    ? 'Take AUX'
-                    : 'Prepare + Take AUX'}
-              </button>
-
-              <button
-                className="aa-danger"
-                type="button"
-                onClick={() =>
-                  void passAux()
-                }
-                disabled={
-                  !iHaveAux ||
-                  busy
-                }
-              >
-                {busy && iHaveAux
-                  ? 'Passing…'
-                  : 'Pass AUX'}
-              </button>
-            </div>
-
-            <div className="aa-signal-row">
-              <span
-                className={
-                  isPublishing
-                    ? 'is-on'
-                    : deckReady
-                      ? 'is-private'
-                      : ''
-                }
-              >
-                {(preparedSource ??
-                  audioSource) ===
-                'browser'
-                  ? 'Browser audio'
-                  : (preparedSource ??
-                        audioSource) ===
-                      'file'
-                    ? 'Audio file'
-                    : 'Input'}{' '}
-                {isPublishing
-                  ? 'ON AIR'
-                  : deckReady
-                    ? 'PRIVATE'
-                    : 'OFF'}
-              </span>
-
-              <span>
-                Signed in as{' '}
-                {displayName}
-              </span>
-            </div>
+              </>
+            )}
           </section>
 
           {/*
