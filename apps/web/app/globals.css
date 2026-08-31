@@ -1,65 +1,920 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+/* Audio Arcade type system
+   Put the user-supplied font files in /public/fonts using the basenames below.
+   The browser will use whichever supplied format exists. */
+
+@font-face{
+  font-family:"Aeonik";
+  src:
+    url("/fonts/Aeonik-Regular.woff2") format("woff2"),
+    url("/fonts/Aeonik-Regular.woff") format("woff"),
+    url("/fonts/Aeonik-Regular.otf") format("opentype"),
+    url("/fonts/Aeonik-Regular.ttf") format("truetype");
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+}
+
+@font-face{
+  font-family:"Aeonik";
+  src:
+    url("/fonts/Aeonik-Bold.woff2") format("woff2"),
+    url("/fonts/Aeonik-Bold.woff") format("woff"),
+    url("/fonts/Aeonik-Bold.otf") format("opentype"),
+    url("/fonts/Aeonik-Bold.ttf") format("truetype");
+  font-style:normal;
+  font-weight:700 900;
+  font-display:swap;
+}
+
+@font-face{
+  font-family:"Thermochrome";
+  src:
+    url("/fonts/Thermochrome-Regular.woff2") format("woff2"),
+    url("/fonts/Thermochrome-Regular.woff") format("woff"),
+    url("/fonts/Thermochrome-Regular.otf") format("opentype"),
+    url("/fonts/Thermochrome-Regular.ttf") format("truetype");
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+}
+
+@font-face{
+  font-family:"Thermochrome";
+  src:
+    url("/fonts/Thermochrome-Bold.woff2") format("woff2"),
+    url("/fonts/Thermochrome-Bold.woff") format("woff"),
+    url("/fonts/Thermochrome-Bold.otf") format("opentype"),
+    url("/fonts/Thermochrome-Bold.ttf") format("truetype");
+  font-style:normal;
+  font-weight:700;
+  font-display:swap;
+}
+
+@font-face{
+  font-family:"Thermochrome";
+  src:
+    url("/fonts/Thermochrome-Ultra.woff2") format("woff2"),
+    url("/fonts/Thermochrome-Ultra.woff") format("woff"),
+    url("/fonts/Thermochrome-Ultra.otf") format("opentype"),
+    url("/fonts/Thermochrome-Ultra.ttf") format("truetype");
+  font-style:normal;
+  font-weight:900;
+  font-display:swap;
+}
 
 
 :root{
-  /* pull from your board: deep maroon, safety red, electric violet, golden yellow, ink */
-  --aa-yellow: #F2D335;   /* poster yellow */
-  --aa-maroon: #3A0D12;   /* deep wine */
-  --aa-red:    #F03A1E;   /* safety red/orange */
-  --aa-violet: #6A5CF7;   /* electric violet */
-  --aa-ink:    #1A0E0F;   /* near-black maroon */
+  --aa-yellow:#f5b71b;
+  --aa-yellow-soft:#ffd86b;
+  --aa-cyan:#18aedd;
+  --aa-blue:#176cb5;
+  --aa-blue-deep:#0d4f92;
+  --aa-navy:#103a68;
+  --aa-white:#fffdf6;
+  --aa-paper:#fff8df;
+  --aa-line:#176cb5;
+  --aa-muted:#56708a;
+  --aa-red:#d94b43;
+  --aa-radius:18px;
+  --aa-shadow:0 4px 0 rgba(13,79,146,.14);
 }
 
-/* subtle CRT scanlines for the header */
-.scanlines{
-  background-image:
-    linear-gradient(rgba(0,0,0,.12) 50%, rgba(0,0,0,0) 50%);
-  background-size: 100% 2px;
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;max-width:100%;overflow-x:hidden;background:var(--aa-yellow);color:var(--aa-navy)}
+body{
+  min-height:100vh;
+  font-family:Arial,Helvetica,sans-serif;
+  background:
+    radial-gradient(circle,var(--aa-blue) 1px,transparent 1.1px),
+    var(--aa-yellow);
+  background-size:16px 16px;
+  background-position:0 0;
+}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.42}
+
+.aa-page{
+  position:relative;
+  isolation:isolate;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  min-height:100vh;
+  margin:0;
+  padding:clamp(.8rem,2.8vw,2rem);
+  color:var(--aa-navy);
+  background:
+    linear-gradient(rgba(245,183,27,.88),rgba(245,183,27,.88)),
+    radial-gradient(circle,var(--aa-blue) 1px,transparent 1.1px);
+  background-size:auto,16px 16px;
+  overflow-x:hidden;
+}
+.aa-centred{display:grid;place-items:center}
+.aa-room-page{width:100%;max-width:92rem;margin:0 auto}
+
+.aa-card{
+  min-width:0;
+  border:2px solid var(--aa-line);
+  border-radius:var(--aa-radius);
+  background:rgba(255,253,246,.95);
+  color:var(--aa-navy);
+  box-shadow:var(--aa-shadow);
+}
+.aa-kicker{
+  margin:0 0 .45rem;
+  color:var(--aa-blue-deep);
+  font-size:.7rem;
+  line-height:1;
+  font-weight:900;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+}
+.aa-muted{color:var(--aa-muted);line-height:1.5}
+.aa-error{margin:.4rem 0 0;color:#a5322d;font-weight:700;font-size:.84rem}
+
+.aa-join-card{width:min(100%,34rem);padding:clamp(1.4rem,5vw,2.8rem)}
+.aa-logo-mark{
+  width:3.3rem;height:3.3rem;display:grid;place-items:center;
+  border-radius:12px;background:var(--aa-blue);color:var(--aa-yellow);
+  border:2px solid var(--aa-blue-deep);font-weight:900;margin-bottom:1.5rem
+}
+.aa-join-card h1,.aa-card h2{
+  margin:0;color:var(--aa-blue-deep);
+  font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
+  font-weight:900;letter-spacing:-.055em
+}
+.aa-join-card h1{font-size:clamp(2.3rem,8vw,4rem);line-height:.95}
+.aa-room-name{margin:.75rem 0 1rem;color:var(--aa-blue);font-weight:900}
+.aa-form{display:grid;gap:.75rem;margin-top:1.35rem}
+.aa-form label,.aa-device-label{font-size:.8rem;font-weight:900;color:var(--aa-blue-deep)}
+.aa-form input,.aa-aux-card select{
+  width:100%;max-width:100%;min-width:0;
+  border:2px solid var(--aa-blue);border-radius:12px;
+  background:var(--aa-yellow-soft);color:var(--aa-blue-deep);
+  padding:.88rem .95rem;outline:none
+}
+.aa-form input:focus,.aa-aux-card select:focus{
+  border-color:var(--aa-blue-deep);box-shadow:0 0 0 4px rgba(24,174,221,.18)
 }
 
-body {
-  @apply bg-black text-gray-200; /* full black background */
-  font-family: 'Orbitron', sans-serif; /* optional PS2-style font */
+.aa-primary,.aa-danger{
+  border:2px solid var(--aa-blue-deep);border-radius:999px;
+  padding:.95rem 1.15rem;font-weight:900;text-transform:uppercase;
+  letter-spacing:.08em;transition:.14s ease
+}
+.aa-primary{background:var(--aa-blue-deep);color:var(--aa-white)}
+.aa-primary:hover:not(:disabled){background:var(--aa-blue);transform:translateY(-1px)}
+.aa-danger{background:var(--aa-white);color:var(--aa-blue-deep)}
+.aa-beta-note{margin-top:1.2rem;padding-top:1rem;border-top:2px dashed rgba(23,108,181,.25);color:var(--aa-muted);font-size:.8rem}
+
+.aa-room-header{
+  width:100%;max-width:82rem;margin:0 auto 1rem;
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;min-width:0
+}
+.aa-brand-block{display:flex;align-items:center;gap:.9rem;min-width:0}
+.aa-brand-logo{
+  display:block;
+  width:clamp(4.1rem,9vw,6.2rem);
+  height:clamp(4.1rem,9vw,6.2rem);
+  object-fit:contain;
+  padding:.48rem;
+  border-radius:14px;
+  border:2px solid var(--aa-blue-deep);
+  background:var(--aa-blue-deep);
+  flex:0 0 auto;
+}
+.aa-room-title{
+  display:block;max-width:28rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--aa-blue-deep);font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
+  font-size:clamp(1.35rem,4vw,2.3rem);line-height:.95;letter-spacing:-.05em;text-transform:uppercase
+}
+.aa-connection{
+  display:inline-flex;align-items:center;gap:.5rem;flex:0 0 auto;
+  padding:.55rem .75rem;border:2px solid var(--aa-blue-deep);border-radius:999px;
+  background:var(--aa-white);color:var(--aa-blue-deep);font-size:.68rem;
+  font-weight:900;text-transform:uppercase;letter-spacing:.08em
+}
+.aa-connection span{width:.65rem;height:.65rem;border-radius:50%;background:var(--aa-yellow)}
+.aa-connection-connected span{background:var(--aa-cyan);box-shadow:0 0 0 4px rgba(24,174,221,.16)}
+
+.aa-room-grid{
+  width:100%;max-width:82rem;margin:0 auto;min-width:0;
+  display:grid;grid-template-columns:minmax(0,1.7fr) minmax(17rem,.75fr);gap:1rem
+}
+.aa-room-grid>*{min-width:0}
+.aa-aux-card,.aa-participants-card{padding:clamp(1rem,2.8vw,1.55rem)}
+.aa-card-heading{display:flex;align-items:center;justify-content:space-between;gap:.8rem}
+.aa-card-heading h2{font-size:clamp(1.7rem,4vw,2.55rem)}
+.aa-live-light{
+  width:.95rem;height:.95rem;border-radius:50%;
+  border:2px solid var(--aa-blue-deep);background:var(--aa-yellow)
+}
+.aa-live-light.is-live{background:var(--aa-cyan);box-shadow:0 0 0 5px rgba(24,174,221,.17)}
+
+.aa-status-panel{
+  margin:1rem 0;padding:1.1rem;min-height:7.5rem;
+  display:flex;flex-direction:column;justify-content:flex-end;gap:.45rem;
+  border:2px solid var(--aa-blue);border-radius:14px;
+  background:linear-gradient(135deg,var(--aa-white),#eefaff)
+}
+.aa-status-panel.is-yours{background:linear-gradient(135deg,var(--aa-cyan),#b9ecff)}
+.aa-status-panel strong{
+  color:var(--aa-blue-deep);font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
+  font-size:clamp(1.35rem,4vw,2.35rem);line-height:.98;letter-spacing:-.045em;text-transform:uppercase
+}
+.aa-status-panel span{color:var(--aa-muted);line-height:1.45}
+
+.aa-source-section{display:grid;gap:.75rem;margin-top:.8rem}
+.aa-section-heading strong{display:block;color:var(--aa-blue-deep);font-size:.98rem;line-height:1.25}
+.aa-source-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}
+.aa-source-card{
+  min-width:0;text-align:left;display:grid;gap:.35rem;padding:.78rem;
+  border:2px solid var(--aa-blue);border-radius:12px;background:var(--aa-white);color:var(--aa-blue-deep)
+}
+.aa-source-card.is-active{background:var(--aa-cyan);border-color:var(--aa-blue-deep)}
+.aa-source-tag{
+  width:max-content;max-width:100%;padding:.22rem .45rem;border-radius:999px;
+  background:var(--aa-blue-deep);color:var(--aa-white);font-size:.58rem;
+  font-weight:900;letter-spacing:.09em;text-transform:uppercase
+}
+.aa-source-card-title{font-weight:900;font-size:.9rem}
+.aa-source-card-meta,.aa-source-tip,.aa-source-warning,.aa-source-panel-copy{
+  min-width:0;color:var(--aa-muted);font-size:.75rem;line-height:1.35;overflow-wrap:anywhere
+}
+.aa-source-panel{
+  min-width:0;display:grid;gap:.7rem;padding:.8rem;
+  border:2px solid var(--aa-blue);border-radius:12px;background:#f8fcff
+}
+.aa-source-panel-title-row{display:flex;justify-content:space-between;align-items:center;gap:.5rem;min-width:0}
+.aa-desktop-badge{
+  flex:0 0 auto;padding:.28rem .48rem;border-radius:999px;background:var(--aa-blue);
+  color:var(--aa-white);font-size:.58rem;font-weight:900;text-transform:uppercase
+}
+.aa-source-actions,.aa-deck-ready-actions{display:flex;flex-wrap:wrap;gap:.5rem;min-width:0}
+.aa-prepare-button,.aa-deck-close,.aa-file-button{
+  min-width:0;border:2px solid var(--aa-blue-deep);border-radius:999px;
+  padding:.68rem .82rem;background:var(--aa-white);color:var(--aa-blue-deep);
+  font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em
+}
+.aa-prepare-button{background:var(--aa-blue-deep);color:var(--aa-white)}
+.aa-browser-tutorial,.aa-selected-file{
+  min-width:0;padding:.75rem;border:2px dashed rgba(23,108,181,.35);
+  border-radius:10px;background:var(--aa-paper);color:var(--aa-muted);font-size:.75rem;overflow-wrap:anywhere
 }
 
-@layer components {
-  .ps2-input {
-    @apply rounded-xl border-2 border-blue-400 bg-black/50 text-blue-100 px-4 py-2
-           focus:outline-none focus:border-blue-500 transition-colors duration-200;
-    text-shadow: 0 0 8px rgba(0,128,255,.4);
+.aa-deck-ready-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:.65rem;flex-wrap:wrap;
+  padding:.7rem .8rem;border:2px solid var(--aa-blue);border-radius:12px;background:#e7f9ff
+}
+.aa-deck-dot{width:.7rem;height:.7rem;border-radius:50%;background:var(--aa-cyan);display:inline-block}
+
+.aa-drum-panel{
+  min-width:0;margin-top:.85rem;padding:.9rem;
+  border:2px solid var(--aa-blue-deep);border-radius:16px;
+  background:linear-gradient(180deg,#f7fcff,#e7f6ff);color:var(--aa-blue-deep)
+}
+.aa-drum-heading{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:.8rem;margin-bottom:.75rem
+}
+.aa-drum-heading strong{
+  font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
+  font-size:1.35rem;letter-spacing:-.05em
+}
+.aa-tempo-control{min-width:10rem;max-width:15rem;display:grid;gap:.3rem}
+.aa-tempo-control label{
+  display:flex;justify-content:space-between;gap:.5rem;
+  color:var(--aa-blue-deep);font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.07em
+}
+.aa-tempo-control input[type="range"]{width:100%;accent-color:var(--aa-cyan)}
+
+.aa-pattern-tabs{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem;margin-bottom:.65rem
+}
+.aa-pattern-tabs button{
+  min-width:0;border:2px solid var(--aa-blue);border-radius:999px;
+  padding:.6rem .7rem;background:var(--aa-white);color:var(--aa-blue-deep);
+  font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em
+}
+.aa-pattern-tabs button.is-active{background:var(--aa-blue);color:var(--aa-white)}
+
+.aa-drum-pads{
+  min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem
+}
+.aa-drum-pad-cell{min-width:0;display:grid;gap:.35rem}
+.aa-drum-pad{
+  min-width:0;aspect-ratio:1.22/1;display:grid;align-content:space-between;text-align:left;
+  padding:.65rem;border:2px solid var(--aa-blue);border-radius:10px;
+  background:var(--aa-white);color:var(--aa-blue-deep)
+}
+.aa-drum-pad.is-loaded{background:var(--aa-yellow-soft)}
+.aa-drum-pad.is-recording{background:var(--aa-cyan);color:var(--aa-white)}
+.aa-drum-pad>span{
+  width:max-content;padding:.15rem .34rem;border:2px solid currentColor;border-radius:999px;
+  font-size:.58rem;font-weight:900
+}
+.aa-drum-pad strong{min-width:0;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aa-drum-pad small{font-size:.6rem;color:var(--aa-muted)}
+.aa-drum-pad-tools{display:grid;grid-template-columns:1fr 1fr;gap:.3rem}
+.aa-drum-pad-tools button{
+  min-width:0;border:2px solid var(--aa-blue);border-radius:999px;
+  padding:.46rem .3rem;background:var(--aa-white);color:var(--aa-blue-deep);
+  font-size:.58rem;font-weight:900;text-transform:uppercase;letter-spacing:.05em
+}
+.aa-drum-pad-tools button.is-recording{background:var(--aa-cyan);color:var(--aa-white)}
+
+.aa-drum-fx{
+  margin-top:.8rem;padding-top:.75rem;border-top:2px solid rgba(23,108,181,.28)
+}
+.aa-drum-fx-heading{
+  display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-bottom:.55rem
+}
+.aa-drum-fx-heading>span{
+  color:var(--aa-blue-deep);font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
+  font-size:.9rem;letter-spacing:.08em;text-transform:uppercase
+}
+.aa-text-button{
+  border:0;background:transparent;color:var(--aa-blue);padding:.2rem;
+  font-size:.68rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em
+}
+
+.aa-fx-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.45rem}
+.aa-fx-control{
+  min-width:0;display:grid;gap:.35rem;padding:.5rem;
+  border:2px solid var(--aa-blue);border-radius:10px;background:var(--aa-white)
+}
+.aa-fx-control.is-dragging{background:var(--aa-yellow-soft)}
+.aa-fx-label{
+  min-width:0;display:flex;justify-content:space-between;gap:.25rem;
+  color:var(--aa-blue-deep);font-size:.56rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em
+}
+.aa-fx-label strong{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.aa-fx-label output{flex:0 0 auto;color:var(--aa-blue);font-size:.56rem;text-transform:none}
+.aa-knob-row{display:grid;place-items:center;min-width:0}
+.aa-knob-drag-zone{
+  width:100%;min-height:5.6rem;display:grid;place-items:center;align-content:center;gap:.25rem;
+  border-radius:8px;outline:none;cursor:ew-resize;touch-action:pan-y;user-select:none
+}
+.aa-knob-drag-zone:focus-visible{box-shadow:0 0 0 3px rgba(24,174,221,.25)}
+.aa-knob{
+  position:relative;width:3.75rem;height:3.75rem;display:grid;place-items:center;border-radius:50%;
+  border:2px solid var(--aa-blue-deep);
+  background:conic-gradient(from -135deg,var(--aa-cyan) var(--aa-fill),#dcefff 0)
+}
+.aa-knob-cap{
+  width:2.55rem;height:2.55rem;border-radius:50%;position:relative;
+  background:var(--aa-yellow);border:2px solid var(--aa-blue-deep)
+}
+.aa-knob-marker{
+  position:absolute;left:50%;top:.24rem;width:.14rem;height:.72rem;border-radius:999px;
+  background:var(--aa-blue-deep);transform:translateX(-50%) rotate(var(--aa-angle));transform-origin:50% 1.05rem
+}
+.aa-knob-drag-hint{color:var(--aa-muted);font-size:.55rem;font-weight:700}
+
+.aa-sequencer-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:.45rem;flex-wrap:wrap;
+  margin-top:.75rem;padding-top:.7rem;border-top:2px solid rgba(23,108,181,.28);
+  color:var(--aa-muted);font-size:.68rem;font-weight:800
+}
+.aa-seq-play,.aa-seq-clear{
+  border:2px solid var(--aa-blue);border-radius:999px;padding:.55rem .7rem;
+  background:var(--aa-white);color:var(--aa-blue-deep);font-size:.62rem;font-weight:900;text-transform:uppercase
+}
+.aa-seq-play.is-active{background:var(--aa-cyan);color:var(--aa-white)}
+
+.aa-step-grid{
+  min-width:0;width:100%;display:grid;gap:.3rem;margin-top:.6rem;
+  overflow-x:auto;padding-bottom:.2rem;-webkit-overflow-scrolling:touch
+}
+.aa-step-row{
+  min-width:31rem;display:grid;grid-template-columns:2.4rem repeat(8,minmax(2.4rem,1fr));gap:.25rem;align-items:center
+}
+.aa-step-row>span{
+  color:var(--aa-blue-deep);font-size:.6rem;font-weight:900;text-transform:uppercase
+}
+.aa-step-row button{
+  min-width:0;min-height:2rem;border:2px solid var(--aa-blue);border-radius:7px;
+  background:var(--aa-white);color:var(--aa-blue-deep);font-size:.58rem;font-weight:900
+}
+.aa-step-row button.is-active{background:var(--aa-yellow);color:var(--aa-blue-deep)}
+.aa-step-row button.is-playhead{box-shadow:inset 0 0 0 2px var(--aa-cyan)}
+.aa-drum-note{margin:.65rem 0 0;color:var(--aa-muted);font-size:.68rem;line-height:1.45}
+
+.aa-actions{display:grid;grid-template-columns:1.35fr 1fr;gap:.55rem;margin-top:.8rem}
+.aa-take-button{min-height:3.55rem}
+.aa-signal-row{
+  display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;
+  margin-top:.7rem;color:var(--aa-muted);font-size:.66rem;font-weight:800
+}
+.aa-signal-row .is-on,.aa-signal-row .is-private{color:var(--aa-blue-deep)}
+
+.aa-count{
+  min-width:2rem;height:2rem;display:grid;place-items:center;border-radius:999px;
+  background:var(--aa-blue);color:var(--aa-white);font-weight:900
+}
+.aa-participant-list{list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:.35rem}
+.aa-participant-list li{
+  min-width:0;display:grid;grid-template-columns:2.4rem minmax(0,1fr) auto;align-items:center;
+  gap:.55rem;padding:.55rem 0;border-bottom:2px dashed rgba(23,108,181,.2)
+}
+.aa-avatar{
+  width:2.3rem;height:2.3rem;overflow:hidden;display:grid;place-items:center;
+  border:2px solid var(--aa-blue);border-radius:10px;background:var(--aa-yellow-soft)
+}
+.aa-avatar-sprite{width:100%;height:100%;display:block;object-fit:cover;image-rendering:pixelated;pointer-events:none}
+.aa-avatar.is-live{background:var(--aa-cyan)}
+.aa-participant-name{
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--aa-blue-deep);font-weight:900
+}
+.aa-participant-name small{display:block;margin-top:.1rem;color:var(--aa-muted);font-size:.58rem;text-transform:uppercase}
+.aa-participant-state{
+  color:var(--aa-muted);font-size:.58rem;font-weight:900;text-transform:uppercase;letter-spacing:.05em
+}
+.aa-participant-state.is-live{color:var(--aa-cyan)}
+.aa-help-box{
+  margin-top:.9rem;padding:.75rem;border:2px solid var(--aa-blue);border-radius:12px;
+  background:var(--aa-paper);color:var(--aa-muted);font-size:.68rem;line-height:1.45
+}
+.aa-help-box strong{color:var(--aa-blue-deep)}
+.aa-help-box ol{margin:.45rem 0 0;padding-left:1rem}
+
+@media(max-width:980px){
+  .aa-room-grid{grid-template-columns:1fr}
+  .aa-participants-card{order:2}
+}
+@media(max-width:760px){
+  .aa-page{padding:.65rem;width:100%;max-width:100%;overflow-x:hidden}
+  .aa-room-header{align-items:flex-start}
+  .aa-source-grid{grid-template-columns:1fr}
+  .aa-drum-pads{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .aa-fx-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .aa-actions{grid-template-columns:1fr}
+}
+@media(max-width:520px){
+  .aa-page{padding:.5rem}
+  .aa-card{border-radius:14px}
+  .aa-aux-card,.aa-participants-card{padding:.75rem}
+  .aa-room-header{gap:.5rem}
+  .aa-brand-block{gap:.55rem}
+  .aa-brand-logo{width:3.35rem;height:3.35rem;border-radius:10px}
+  .aa-room-title{font-size:1.15rem;max-width:9.5rem}
+  .aa-connection{padding:.42rem .55rem;font-size:.55rem}
+  .aa-status-panel{min-height:6rem;padding:.8rem}
+  .aa-status-panel strong{font-size:1.28rem}
+  .aa-drum-heading{display:grid;grid-template-columns:1fr}
+  .aa-tempo-control{width:100%;max-width:none}
+  .aa-drum-pads{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .aa-drum-pad{aspect-ratio:1.15/1;min-height:6.2rem}
+  .aa-fx-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .aa-knob-drag-zone{min-height:5rem}
+  .aa-step-grid{margin-right:0}
+  .aa-step-row{min-width:27rem;grid-template-columns:2rem repeat(8,minmax(2rem,1fr))}
+  .aa-sequencer-bar{align-items:stretch}
+  .aa-seq-play,.aa-seq-clear{flex:1 1 auto}
+}
+
+
+/* ---------------------------------------------------------
+   AUX / SAMPLER PRIMARY TABS
+   --------------------------------------------------------- */
+
+.aa-room-tabs{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:.5rem;
+  margin-top:1rem;
+  padding:.35rem;
+  border:2px solid var(--aa-blue-deep);
+  border-radius:999px;
+  background:rgba(255,253,246,.75);
+}
+
+.aa-room-tabs button{
+  min-width:0;
+  min-height:2.8rem;
+  border:0;
+  border-radius:999px;
+  background:transparent;
+  color:var(--aa-blue-deep);
+  font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
+  font-size:.78rem;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  transition:
+    background .14s ease,
+    color .14s ease,
+    transform .14s ease;
+}
+
+.aa-room-tabs button.is-active{
+  background:var(--aa-blue-deep);
+  color:var(--aa-white);
+}
+
+.aa-room-tabs button:not(.is-active):hover{
+  background:rgba(24,174,221,.12);
+}
+
+.aa-room-tabs button:active{
+  transform:translateY(1px);
+}
+
+/*
+ * The AUX action is the main interaction, so it lives directly
+ * beneath the current-signal panel and receives stronger weight.
+ */
+.aa-actions{
+  margin-top:.65rem;
+  margin-bottom:.35rem;
+}
+
+.aa-take-button{
+  min-height:4rem;
+  font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
+  font-size:.92rem;
+  letter-spacing:.075em;
+}
+
+.aa-danger{
+  min-height:4rem;
+}
+
+.aa-signal-row{
+  margin-top:.4rem;
+  margin-bottom:.85rem;
+}
+
+.aa-sampler-hint{
+  margin-top:1rem;
+  padding:.8rem .9rem;
+  border:2px dashed var(--aa-blue);
+  border-radius:12px;
+  background:var(--aa-yellow-soft);
+  color:var(--aa-blue-deep);
+  font-size:.76rem;
+  font-weight:800;
+  line-height:1.4;
+}
+
+/* With the sampler isolated into its own tab it can use the card width. */
+.aa-room-tabs + .aa-drum-panel{
+  margin-top:1rem;
+}
+
+.aa-drum-panel{
+  margin-top:1rem;
+}
+
+/* Bolder designed display hierarchy, without adding an external font dependency. */
+.aa-room-title,
+.aa-status-panel strong,
+.aa-card-heading h2,
+.aa-drum-heading strong,
+.aa-join-card h1{
+  font-family:Impact,"Arial Black","Helvetica Neue",Arial,sans-serif;
+  font-weight:900;
+}
+
+@media(max-width:520px){
+  .aa-brand-logo{
+    width:3.8rem;
+    height:3.8rem;
+    padding:.38rem;
+  }
+
+  .aa-room-tabs{
+    margin-top:.75rem;
+  }
+
+  .aa-room-tabs button{
+    min-height:2.65rem;
+    font-size:.68rem;
+  }
+
+  .aa-actions{
+    gap:.45rem;
+  }
+
+  .aa-take-button,
+  .aa-danger{
+    min-height:3.65rem;
   }
 }
 
-.ps2-btn {
-@apply relative inline-flex items-center justify-center
-           px-4 py-2 rounded-xl border-2
-           border-blue-400 text-blue-200 uppercase tracking-wider
-           transition-all duration-200
-           hover:border-blue-500 hover:text-white;
-    background: rgba(0, 0, 64, 0.3);
-    text-shadow: 0 0 8px rgba(0, 128, 255, 0.6);
+/* ---------------------------------------------------------
+   AUDIO ARCADE TYPOGRAPHY PASS
+   Aeonik = interface/body
+   Thermochrome Regular = device labels / small headers
+   Thermochrome Bold + Ultra = display moments only
+   --------------------------------------------------------- */
+
+html,
+body,
+button,
+input,
+select,
+textarea{
+  font-family:"Aeonik",Arial,Helvetica,sans-serif;
+  font-synthesis:none;
 }
 
-/* optional glowing animation */
-.ps2-btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: 0 0 10px rgba(0, 128, 255, 0.8),
-              0 0 20px rgba(0, 128, 255, 0.6);
-  opacity: 0;
-  transition: opacity 0.3s ease;
+body{
+  font-weight:400;
+  letter-spacing:-.005em;
 }
 
-.ps2-btn:hover::after {
-  opacity: 1;
+.aa-muted,
+.aa-source-card-meta,
+.aa-source-tip,
+.aa-source-warning,
+.aa-source-panel-copy,
+.aa-browser-tutorial,
+.aa-selected-file,
+.aa-drum-note,
+.aa-help-box,
+.aa-status-panel span{
+  font-family:"Aeonik",Arial,Helvetica,sans-serif;
+  font-weight:400;
+  letter-spacing:0;
 }
 
-/* Optional grid wrapper to mimic PS2 menu tiles */
-@layer utilities {
-  .ps2-grid { @apply grid grid-cols-2 gap-4 place-items-center; }
+/* Thermochrome regular: small hardware / editorial labels. */
+.aa-kicker,
+.aa-device-label,
+.aa-source-tag,
+.aa-participant-state,
+.aa-tempo-control label,
+.aa-fx-label,
+.aa-step-row > span,
+.aa-connection,
+.aa-signal-row,
+.aa-drum-pad > span{
+  font-family:"Thermochrome","Aeonik",Arial,sans-serif;
+  font-weight:400;
+  letter-spacing:.105em;
 }
+
+/* More editorial than Impact: medium display labels. */
+.aa-room-title,
+.aa-drum-heading strong,
+.aa-participants-card .aa-card-heading h2,
+.aa-source-card-title,
+.aa-section-heading strong{
+  font-family:"Thermochrome","Aeonik",Arial,sans-serif;
+  font-weight:700;
+  letter-spacing:-.035em;
+}
+
+/* Large, special display moments only. */
+.aa-aux-card > .aa-card-heading h2,
+.aa-status-panel strong,
+.aa-join-card h1{
+  font-family:"Thermochrome","Aeonik",Arial,sans-serif;
+  font-weight:900;
+  letter-spacing:-.055em;
+  text-transform:uppercase;
+  transform:translateZ(0);
+  will-change:filter,text-shadow,opacity;
+  animation:aa-led-strobe 7.2s steps(1,end) infinite;
+}
+
+/* AUX available keeps mixed case while still using Thermochrome Ultra. */
+.aa-aux-card > .aa-card-heading h2{
+  text-transform:none;
+}
+
+/* Tabs and important controls use Aeonik bold for clean product UI. */
+.aa-room-tabs button,
+.aa-primary,
+.aa-danger,
+.aa-prepare-button,
+.aa-deck-close,
+.aa-file-button,
+.aa-take-button,
+.aa-drum-pad strong,
+.aa-drum-pad-tools button,
+.aa-seq-play,
+.aa-seq-clear,
+.aa-text-button{
+  font-family:"Aeonik",Arial,Helvetica,sans-serif;
+  font-weight:800;
+  letter-spacing:.045em;
+}
+
+/* Avoid the previous heavy/condensed Impact feel. */
+.aa-card-heading h2{
+  line-height:.98;
+}
+
+.aa-status-panel strong{
+  line-height:.94;
+}
+
+.aa-room-title{
+  line-height:.92;
+}
+
+@keyframes aa-led-strobe{
+  0%,72%,76%,100%{
+    opacity:1;
+    filter:blur(0);
+    text-shadow:0 0 0 rgba(24,174,221,0);
+  }
+
+  72.5%{
+    opacity:.93;
+    filter:blur(.45px);
+    text-shadow:
+      1px 0 0 rgba(24,174,221,.38),
+      -1px 0 0 rgba(245,183,27,.28);
+  }
+
+  73%{
+    opacity:1;
+    filter:blur(0);
+    text-shadow:0 0 6px rgba(24,174,221,.16);
+  }
+
+  74.1%{
+    opacity:.86;
+    filter:blur(.8px);
+    text-shadow:
+      2px 0 2px rgba(24,174,221,.42),
+      -1px 0 2px rgba(245,183,27,.32);
+  }
+
+  74.45%{
+    opacity:1;
+    filter:blur(.08px);
+    text-shadow:0 0 10px rgba(24,174,221,.13);
+  }
+
+  75%{
+    opacity:.96;
+    filter:blur(.25px);
+    text-shadow:1px 0 0 rgba(24,174,221,.25);
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .aa-aux-card > .aa-card-heading h2,
+  .aa-status-panel strong,
+  .aa-join-card h1{
+    animation:none;
+    filter:none;
+    text-shadow:none;
+  }
+}
+
+/* ---------------------------------------------------------
+   TYPE SPACING REFINEMENT
+   Keeps Thermochrome character but gives its wide glyphs
+   more breathing room and prevents stacked/overlapping copy.
+   --------------------------------------------------------- */
+
+/* Body / UI copy */
+body,
+button,
+input,
+select,
+textarea{
+  line-height:1.4;
+}
+
+.aa-muted,
+.aa-source-card-meta,
+.aa-source-tip,
+.aa-source-warning,
+.aa-source-panel-copy,
+.aa-browser-tutorial,
+.aa-selected-file,
+.aa-drum-note,
+.aa-help-box,
+.aa-status-panel span{
+  line-height:1.55;
+}
+
+/* Small Thermochrome labels */
+.aa-kicker,
+.aa-device-label,
+.aa-source-tag,
+.aa-participant-state,
+.aa-tempo-control label,
+.aa-fx-label,
+.aa-step-row > span,
+.aa-connection,
+.aa-signal-row,
+.aa-drum-pad > span{
+  line-height:1.2;
+  letter-spacing:.12em;
+}
+
+/* Medium display labels */
+.aa-room-title,
+.aa-drum-heading strong,
+.aa-participants-card .aa-card-heading h2{
+  line-height:1.08;
+  letter-spacing:.005em;
+}
+
+/* Use Aeonik for dense interface titles so they remain clean and readable. */
+.aa-source-card-title,
+.aa-section-heading strong{
+  font-family:"Aeonik",Arial,Helvetica,sans-serif;
+  font-weight:800;
+  letter-spacing:-.01em;
+  line-height:1.22;
+}
+
+/* Large Thermochrome Ultra moments */
+.aa-aux-card > .aa-card-heading h2,
+.aa-status-panel strong,
+.aa-join-card h1{
+  line-height:1.04;
+  letter-spacing:-.012em;
+  word-spacing:.05em;
+}
+
+/* Give the big status panel a little more room around the type. */
+.aa-status-panel{
+  gap:.7rem;
+}
+
+.aa-status-panel strong{
+  padding-top:.05em;
+  padding-bottom:.05em;
+}
+
+/* Prevent headers from sitting on top of nearby copy. */
+.aa-card-heading,
+.aa-section-heading,
+.aa-drum-heading{
+  row-gap:.5rem;
+}
+
+.aa-section-heading{
+  margin-bottom:.15rem;
+}
+
+.aa-source-card{
+  row-gap:.45rem;
+}
+
+.aa-source-card-title{
+  margin-top:.05rem;
+}
+
+/* Slightly roomier player title */
+.aa-participants-card .aa-card-heading h2{
+  padding-bottom:.05em;
+}
+
+@media(max-width:520px){
+  .aa-aux-card > .aa-card-heading h2,
+  .aa-status-panel strong,
+  .aa-join-card h1{
+    line-height:1.06;
+    letter-spacing:-.005em;
+  }
+
+  .aa-room-title,
+  .aa-drum-heading strong,
+  .aa-participants-card .aa-card-heading h2{
+    line-height:1.1;
+  }
+
+  .aa-section-heading strong,
+  .aa-source-card-title{
+    line-height:1.24;
+  }
+}
+
+/* ---------------------------------------------------------
+   AUX STATUS HEADING — EXTRA GLYPH SPACING
+   Thermochrome Ultra is very tight by design, so use Bold
+   here and explicitly disable kerning/ligatures.
+   --------------------------------------------------------- */
+
+.aa-aux-card > .aa-card-heading h2{
+  font-family:"Thermochrome","Aeonik",Arial,sans-serif;
+  font-weight:700;
+  font-kerning:none;
+  font-variant-ligatures:none;
+  letter-spacing:.055em;
+  word-spacing:.12em;
+  line-height:1.08;
+  text-transform:none;
+}
+
+@media(max-width:520px){
+  .aa-aux-card > .aa-card-heading h2{
+    letter-spacing:.045em;
+    word-spacing:.1em;
+    line-height:1.1;
+  }
+}
+

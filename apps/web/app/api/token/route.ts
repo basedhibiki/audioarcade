@@ -1,90 +1,67 @@
-// apps/web/app/api/token/route.ts
-import { NextResponse } from "next/server";
-import { AccessToken } from "livekit-server-sdk";
-import { z } from "zod";
-import { supabaseServer } from "@/lib/supabase";
+import { NextResponse } from 'next/server'
+import { AccessToken } from 'livekit-server-sdk'
+import { z } from 'zod'
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-// Admins (comma-separated emails in .env)
-const admins = new Set(
-  (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-);
-
-// ---- CORS (dev: allow all) ----
-function cors(res: NextResponse) {
-  res.headers.set("Access-Control-Allow-Origin", "*");
-  res.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.headers.set("Access-Control-Max-Age", "86400");
-  return res;
-}
-export async function OPTIONS() {
-  return cors(new NextResponse(null, { status: 204 }));
-}
-
-// ---- Body schema ----
 const BodySchema = z.object({
-  room: z.string().min(1),
-  identity: z.string().min(1).optional(),
-  role: z.enum(["admin", "host", "participant", "audience"]).default("participant"),
-});
+  room: z.string().trim().min(1).max(128),
+  displayName: z.string().trim().min(1).max(32),
+  password: z.string().min(1).max(128),
+})
 
-export async function POST(req: Request) {
-  // 1) Validate env
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-  if (!apiKey || !apiSecret) {
+function cors(response: NextResponse) {
+  response.headers.set('Access-Control-Allow-Origin', '*')
+  response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type')
+  response.headers.set('Access-Control-Max-Age', '86400')
+  return response
+}
+
+export async function OPTIONS() {
+  return cors(new NextResponse(null, { status: 204 }))
+}
+
+export async function POST(request: Request) {
+  const apiKey = process.env.LIVEKIT_API_KEY
+  const apiSecret = process.env.LIVEKIT_API_SECRET
+  const roomPassword = process.env.AUDIO_ARCADE_ROOM_PASSWORD
+
+  if (!apiKey || !apiSecret || !roomPassword) {
     return cors(
       NextResponse.json(
-        { error: "LIVEKIT_API_KEY/SECRET missing" },
-        { status: 500 }
-      )
-    );
+        { error: 'The LiveKit credentials or room password are missing.' },
+        { status: 500 },
+      ),
+    )
   }
 
-  // 2) Parse body (Zod)
-  let body: z.infer<typeof BodySchema>;
-  try {
-    body = BodySchema.parse(await req.json());
-  } catch {
-    return cors(NextResponse.json({ error: "Invalid body" }, { status: 400 }));
+  const parsed = BodySchema.safeParse(await request.json().catch(() => null))
+  if (!parsed.success) {
+    return cors(NextResponse.json({ error: 'Enter a valid room and display name.' }, { status: 400 }))
   }
-  const room = String(body.room);
-  const requestedRole = body.role;
-  const identityFromClient = body.identity;
 
-  // 3) Get Supabase user (for email + admin check)
-  const supabase = supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const email = user?.email ?? null;
-  const isAdmin = !!email && admins.has(email);
+  const { room, displayName, password } = parsed.data
 
-  // 4) Choose identity and grants
-  const identity =
-    identityFromClient ??
-    email ??
-    "guest_" + Math.random().toString(36).slice(2);
+  if (password !== roomPassword) {
+    return cors(NextResponse.json({ error: 'Incorrect room password.' }, { status: 401 }))
+  }
+  const identity = `web_${crypto.randomUUID()}`
+  const token = new AccessToken(apiKey, apiSecret, {
+    identity,
+    name: displayName,
+    ttl: '2h',
+  })
 
-  const at = new AccessToken(apiKey, apiSecret, { identity, ttl: "1h" });
-
-  at.addGrant({
+  token.addGrant({
     room,
     roomJoin: true,
     canSubscribe: true,
-    // Allow publish if admin or host/participant (tune as needed)
-    canPublish: isAdmin || requestedRole === "host" || requestedRole === "participant",
-    // Example: restrict sources later (music bot, etc.)
-    // canPublishSources: ["microphone"],
-  });
+    canPublish: true,
+    canPublishData: true,
+    canUpdateOwnMetadata: true,
+  })
 
-  // 5) Mint & return token
-  const token = await at.toJwt();
-  return cors(NextResponse.json({ token, isAdmin, email }, { status: 200 }));
+  return cors(NextResponse.json({ token: await token.toJwt() }))
 }
